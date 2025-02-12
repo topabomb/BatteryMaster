@@ -1,3 +1,4 @@
+use battery::BatteryInfo;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tauri_plugin_autostart::MacosLauncher;
@@ -22,8 +23,8 @@ pub fn run() {
         .setup(|app| {
             let config = config::load_config().expect("load_config err.");
             app.manage(Arc::new(Mutex::new(session::SessionState {
-                tray_number: 0,
                 config: config,
+                info: BatteryInfo::default(),
             })));
             config::set_autostart(app.app_handle(), config.auto_start);
             tray::build(app, "main");
@@ -38,7 +39,7 @@ pub fn run() {
                         let state = handler.state::<Arc<Mutex<session::SessionState>>>();
                         let mut state = state.lock().await;
                         let info = bms_clone.lock().await.current.clone().unwrap();
-                        state.tray_number = info.energy_rate.round() as i32;
+                        state.info = info.clone();
                         handler.emit("battery_info_updated", info).unwrap();
                         secs = state.config.service_update;
                     }

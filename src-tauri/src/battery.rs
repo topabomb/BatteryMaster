@@ -11,7 +11,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub struct SerializableState(State);
+pub struct SerializableState(pub State);
 impl Serialize for SerializableState {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -77,6 +77,26 @@ pub struct BatteryInfo {
     //cpu model
     pub cpu_model: String,
 }
+impl Default for BatteryInfo {
+    fn default() -> Self {
+        BatteryInfo {
+            timestamp: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            state: SerializableState(State::default()),
+            percentage: 0.0,
+            energy_rate: 0.0,
+            voltage: 0.0,
+            state_of_health: 0.0,
+            design_capacity: 0.0,
+            full_capacity: 0.0,
+            capacity: 0.0,
+            cpu_load: 0.0,
+            cpu_model: "unknow".to_string(),
+        }
+    }
+}
 #[derive(Clone)]
 pub struct Battery {
     pub current: Result<BatteryInfo, ()>,
@@ -96,22 +116,8 @@ impl Battery {
             .as_ref()
             .map_or_else(|| "nan", |pbs| pbs.as_str())
             .to_string();
-        let mut record = BatteryInfo {
-            timestamp: SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            state: SerializableState(State::default()),
-            percentage: 0.0,
-            energy_rate: 0.0,
-            voltage: 0.0,
-            state_of_health: 0.0,
-            design_capacity: 0.0,
-            full_capacity: 0.0,
-            capacity: 0.0,
-            cpu_load: 0.0,
-            cpu_model: cpu_model,
-        };
+        let mut record = BatteryInfo::default();
+        record.cpu_model = cpu_model;
         //查询电池数量
         let batteries = bms.batteries().unwrap();
         for battery in batteries {

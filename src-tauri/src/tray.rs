@@ -1,5 +1,7 @@
 use crate::battery;
+use crate::battery::SerializableState;
 use crate::session;
+use ::battery::State;
 use image::{ExtendedColorType, ImageBuffer, ImageEncoder, Rgb, Rgba};
 use rusttype::{Font, Scale};
 use std::sync::Arc;
@@ -82,15 +84,27 @@ async fn update_tray_icon(tray: &TrayIcon) {
         .app_handle()
         .state::<Arc<Mutex<session::SessionState>>>();
     let state = state.lock().await;
-    let color = if state.tray_number > 0 {
-        Rgb([0, 255, 0])
-    } else {
-        Rgb([255, 0, 0])
+    let tray_number = match state.info.state {
+        SerializableState(State::Full) => (state.info.cpu_load * 10000.0).round() / 100.0,
+        _ => (state.info.energy_rate * 100.0).round() / 100.0,
+    };
+    let color = match state.info.state {
+        SerializableState(State::Charging) => Rgb([0, 255, 0]),
+        SerializableState(State::Discharging) => Rgb([255, 0, 0]),
+        SerializableState(State::Full) => Rgb([255, 255, 0]),
+        _ => Rgb([255, 255, 255]),
     };
 
-    let icon_bytes = generate_tray_icon(color, state.tray_number.abs()).unwrap();
+    let icon_bytes = generate_tray_icon(color, tray_number.abs() as i32).unwrap();
     tray.set_icon(TauriImage::from_bytes(&icon_bytes).ok())
         .expect("set tray icon error.");
+    let tooltip = match state.info.state {
+        SerializableState(State::Charging) => format!("Charging {}w", tray_number),
+        SerializableState(State::Discharging) => format!("Discharging {}w", tray_number),
+        SerializableState(State::Full) => format!("Full,Cpu load {}%", tray_number),
+        _ => "Battery Monitor".to_string(),
+    };
+    tray.set_tooltip(Some(tooltip)).expect("set tooltip err.");
 }
 pub fn build(app: &App, id: &str) {
     let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>).unwrap();

@@ -25,7 +25,6 @@ pub struct Config {
     pub record_battery_history: bool, // 是否记录电池活动历史
 }
 
-// 提供默认配置
 impl Default for Config {
     fn default() -> Self {
         Config {
