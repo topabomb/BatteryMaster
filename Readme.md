@@ -2,7 +2,7 @@
 
 The Battery Monitor is a small tool developed using Rust. It allows you to monitor the charging and discharging power of your battery in real-time from the taskbar. You can also view various critical battery information in real-time. More features are currently under development, so stay tuned!
 
-[Download](/releases/)
+[Download](https://github.com/topabomb/BatteryMonitor/releases/)
 
 # History
 
