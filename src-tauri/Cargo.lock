@@ -3,6 +3,24 @@
 version = 4
 
 [[package]]
+name = "BatteryMonitor"
+version = "0.1.0"
+dependencies = [
+ "battery",
+ "image",
+ "raw-cpuid",
+ "rusttype",
+ "serde",
+ "serde_json",
+ "sys-info",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-opener",
+ "tokio",
+]
+
+[[package]]
 name = "ab_glyph_rasterizer"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4342,24 +4360,6 @@ dependencies = [
  "webview2-com",
  "window-vibrancy",
  "windows",
-]
-
-[[package]]
-name = "tauri-app"
-version = "0.1.0"
-dependencies = [
- "battery",
- "image",
- "raw-cpuid",
- "rusttype",
- "serde",
- "serde_json",
- "sys-info",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-opener",
- "tokio",
 ]
 
 [[package]]

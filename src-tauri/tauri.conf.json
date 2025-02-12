@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-app",
+  "productName": "BatteryMonitor",
   "version": "0.1.0",
-  "identifier": "com.tauri-app.app",
+  "identifier": "net.weero.BatteryMonitor.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
       {
         "center": true,
         "shadow": true,
-        "title": "tauri-app",
+        "title": "BatteryMonitor",
         "width": 800,
         "height": 600,
         "transparent": false,
