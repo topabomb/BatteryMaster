@@ -1,5 +1,5 @@
 use battery::{
-    units::{electric_potential::volt, energy::watt_hour, power::watt, ratio::ratio},
+    units::{electric_potential::volt, energy::watt_hour, power::watt, ratio::ratio, time::second},
     Manager as BatteryManager, State,
 };
 use raw_cpuid::CpuId;
@@ -76,6 +76,10 @@ pub struct BatteryInfo {
     pub cpu_load: f32,
     //cpu model
     pub cpu_model: String,
+
+    pub serial_number: String,
+    pub time_to_empty_secs: u64,
+    pub time_to_full_secs: u64,
 }
 impl Default for BatteryInfo {
     fn default() -> Self {
@@ -94,6 +98,9 @@ impl Default for BatteryInfo {
             capacity: 0.0,
             cpu_load: 0.0,
             cpu_model: "unknow".to_string(),
+            serial_number: String::from("unknow"),
+            time_to_empty_secs: 0,
+            time_to_full_secs: 0,
         }
     }
 }
@@ -122,6 +129,10 @@ impl Battery {
         let batteries = bms.batteries().unwrap();
         for battery in batteries {
             let battery = battery.unwrap();
+            record.serial_number = match battery.serial_number() {
+                Some(val) => String::from(val),
+                None => String::from("unknow"),
+            };
             record.percentage = battery.state_of_charge().get::<ratio>();
             record.state = SerializableState(battery.state());
             record.voltage = battery.voltage().get::<volt>();
@@ -135,6 +146,15 @@ impl Battery {
             record.full_capacity = battery.energy_full().get::<watt_hour>();
             record.capacity = battery.energy().get::<watt_hour>();
             record.cpu_load = loadavg().unwrap().one as f32;
+
+            record.time_to_empty_secs = match battery.time_to_empty() {
+                Some(duration) => duration.get::<second>() as u64,
+                None => 0,
+            };
+            record.time_to_full_secs = match battery.time_to_full() {
+                Some(duration) => duration.get::<second>() as u64,
+                None => 0,
+            };
             break;
         }
         record

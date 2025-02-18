@@ -1,9 +1,9 @@
 use battery::BatteryInfo;
+use std::panic;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_autostart::ManagerExt;
-
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 
@@ -15,6 +15,13 @@ mod tray;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    panic::set_hook(Box::new(|info| {
+        // 这里你可以自定义 panic 处理逻辑
+        println!("A panic occurred: {:?}", info);
+
+        // 可以选择直接退出进程（如果你希望发生 panic 时退出）
+        std::process::exit(1); // 可以替换为你希望的退出代码
+    }));
     tauri::Builder::default()
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
