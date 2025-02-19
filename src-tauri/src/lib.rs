@@ -23,6 +23,18 @@ pub fn run() {
         std::process::exit(1); // 可以替换为你希望的退出代码
     }));
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                if window.is_minimized().unwrap() {
+                    window.unminimize().unwrap();
+                }
+                if window.is_maximized().unwrap() {
+                    window.unmaximize().unwrap();
+                }
+                window.show().unwrap();
+                window.set_focus().unwrap();
+            }
+        }))
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec!["--flag1", "--flag2"]),
