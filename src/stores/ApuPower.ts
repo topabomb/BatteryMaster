@@ -7,6 +7,9 @@ export interface LimitSet {
   fast_limit: number;
   slow_limit: number;
 }
+export interface FormValue extends LimitSet {
+  auto_lock: boolean;
+}
 export interface PowerInfo extends LimitSet {
   table: number;
   cpu_family: number;
@@ -16,11 +19,18 @@ export interface PowerInfo extends LimitSet {
 }
 export interface ApuPower extends PowerInfo {
   isAdmin: boolean;
+  form_value: FormValue;
 }
 let listenHandle: Promise<UnlistenFn>;
 export const useStore = defineStore("ApuPower", {
   state: (): ApuPower => {
     return {
+      form_value: {
+        auto_lock: false,
+        stapm_limit: 12,
+        slow_limit: 15,
+        fast_limit: 15,
+      },
       isAdmin: false,
       table: 0,
       cpu_family: 0,

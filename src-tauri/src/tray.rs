@@ -125,8 +125,8 @@ pub fn build(app: &App, id: &str) {
     let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>).unwrap();
     let admin_i =
         MenuItem::with_id(app, "admin", "Run at Administrator", true, None::<&str>).unwrap();
-    //admin_i.set_enabled(!windows::is_admin()).unwrap();
-    let menu = Menu::with_items(app, &[&quit_i, &admin_i]).unwrap();
+    admin_i.set_enabled(!windows::is_admin()).unwrap();
+    let menu = Menu::with_items(app, &[&admin_i, &quit_i]).unwrap();
     let tray = TrayIconBuilder::with_id(id)
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -137,11 +137,6 @@ pub fn build(app: &App, id: &str) {
             "admin" => {
                 if !windows::is_admin() {
                     windows::elevate_self();
-                } else {
-                    match power::PowerInfo::new() {
-                        Ok(info) => app.app_handle().emit("power_info_updated", info).unwrap(),
-                        Err(_) => todo!(),
-                    }
                 }
             }
             _ => (),

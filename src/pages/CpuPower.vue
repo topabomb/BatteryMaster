@@ -281,7 +281,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { useQuasar } from "quasar";
 const $q = useQuasar();
 const power_store = usePower();
-const battery_store = userBattery();
 const sys_store = useSystem();
 const modifyed = ref(false);
 const loading = ref(false);
@@ -339,12 +338,7 @@ const onReset = async () => {
   await set_limit(previous_limit.value);
   modifyed.value = false;
 };
-const form_value = ref({
-  auto_lock: false,
-  stapm_limit: 12,
-  fast_limit: 20,
-  slow_limit: 15,
-});
+const form_value = ref(power_store.form_value);
 const exec_elevate_self = async () => {
   await invoke("exec_elevate_self");
 };
