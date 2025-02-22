@@ -15,7 +15,7 @@
         "center": true,
         "shadow": true,
         "title": "BatteryMonitor",
-        "width": 800,
+        "width": 640,
         "height": 600,
         "transparent": false,
         "decorations": false

@@ -2,7 +2,7 @@ use battery::{
     units::{electric_potential::volt, energy::watt_hour, power::watt, ratio::ratio, time::second},
     Manager as BatteryManager, State,
 };
-use raw_cpuid::CpuId;
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{sync::Arc, time::SystemTime};
 use sys_info::loadavg;
@@ -74,8 +74,6 @@ pub struct BatteryInfo {
     pub capacity: f32,
     //cpu使用率
     pub cpu_load: f32,
-    //cpu model
-    pub cpu_model: String,
 
     pub serial_number: String,
     pub time_to_empty_secs: u64,
@@ -97,7 +95,6 @@ impl Default for BatteryInfo {
             full_capacity: 0.0,
             capacity: 0.0,
             cpu_load: 0.0,
-            cpu_model: "unknow".to_string(),
             serial_number: String::from("unknow"),
             time_to_empty_secs: 0,
             time_to_full_secs: 0,
@@ -124,7 +121,7 @@ impl Battery {
             .map_or_else(|| "nan", |pbs| pbs.as_str())
             .to_string();
         let mut record = BatteryInfo::default();
-        record.cpu_model = cpu_model;
+
         //查询电池数量
         let batteries = bms.batteries().unwrap();
         for battery in batteries {

@@ -11,17 +11,30 @@
           indicator-color="transparent"
         >
           <q-route-tab name="monitor" label="监控" to="/monitor" exact />
+          <!--
           <q-route-tab name="history" label="历史" to="/history" exact />
+          -->
           <q-route-tab name="cpupower" label="功耗" to="/cpupower" exact />
           <q-route-tab name="setting" label="设置" to="/setting" exact />
         </q-tabs>
-
         <q-space />
-        <q-btn dense flat :icon="state_icon" :color="state_color" to="/monitor">
-          <q-badge :color="state_color" transparent
-            >{{ (battery_store.percentage * 100).toFixed(1) }}%</q-badge
-          >
+        <q-chip square :color="state_color" size="sm" class="text-white">
+          {{ time_of_battery }}
+        </q-chip>
+        <q-btn
+          size="sm"
+          flat
+          :icon="state_icon"
+          :color="state_color"
+          dense
+          class="q-ml-none q-pl-none"
+        >
+          <q-chip square :color="state_color" size="sm" class="text-white">
+            {{ (battery_store.percentage * 100).toFixed(1) }}%
+          </q-chip>
         </q-btn>
+
+        <q-separator vertical></q-separator>
         <q-btn dense flat icon="minimize" @click="minimize" />
         <q-btn dense flat icon="close" @click="close" />
       </q-bar>
@@ -34,22 +47,23 @@
 </template>
 <script setup lang="ts">
 import { useQuasar } from "quasar";
+import { formatDuration, intervalToDuration } from "date-fns";
 import { onMounted, computed, ref } from "vue";
-import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import {
-  useStore as useBatteryInfoStore,
-  BatteryInfo,
-} from "./stores/BatteryInfo";
-import { useRouter, useRoute } from "vue-router";
-import { invoke } from "@tauri-apps/api/core";
+import { useStore as useBatteryInfo, BatteryInfo } from "./stores/BatteryInfo";
+import { useRouter } from "vue-router";
 import { useStore as useConfig, Config } from "./stores/Config";
+import { useStore as usePower, ApuPower } from "./stores/ApuPower";
+import { useStore as useSystem } from "./stores/SystemInfo";
+
 const config_store = useConfig();
 config_store.load().then();
-const battery_store = useBatteryInfoStore();
-listen<BatteryInfo>("battery_info_updated", (e) => {
-  battery_store.update(e.payload);
-});
+const battery_store = useBatteryInfo();
+battery_store.load().then();
+const power_store = usePower();
+power_store.load().then();
+const sys_store = useSystem();
+sys_store.load().then();
 const state_color = computed(() => {
   switch (battery_store.state) {
     case "Full":
@@ -60,6 +74,30 @@ const state_color = computed(() => {
       return "orange";
     default:
       return "amber";
+  }
+});
+const time_of_battery = computed(() => {
+  switch (battery_store.state) {
+    case "Full":
+      return `${battery_store.capacity.toFixed(2)}wh`;
+    case "Charging":
+      return formatDuration(
+        intervalToDuration({
+          start: 0,
+          end: battery_store.time_to_full_secs * 1000,
+        }),
+        { format: ["hours", "minutes"] }
+      );
+    case "Discharging":
+      return formatDuration(
+        intervalToDuration({
+          start: 0,
+          end: battery_store.time_to_empty_secs * 1000,
+        }),
+        { format: ["hours", "minutes"] }
+      );
+    default:
+      return "unknow";
   }
 });
 const state_icon = computed(() => {

@@ -1,11 +1,14 @@
-use crate::battery;
 use crate::battery::SerializableState;
+use crate::power;
 use crate::session;
+use crate::windows;
 use ::battery::State;
 use humantime::format_duration;
 use image::{ExtendedColorType, ImageBuffer, ImageEncoder, Rgb, Rgba};
+use libapuadj;
 use rusttype::{Font, Scale};
 use std::{error::Error, sync::Arc};
+use tauri::Emitter;
 use tauri::{
     image::Image as TauriImage,
     menu::{Menu, MenuItem},
@@ -85,11 +88,11 @@ async fn update_tray_icon(tray: &TrayIcon) {
         .app_handle()
         .state::<Arc<Mutex<session::SessionState>>>();
     let state = state.lock().await;
-    let tray_number = match state.info.state {
-        SerializableState(State::Full) => (state.info.cpu_load * 10000.0).round() / 100.0,
-        _ => (state.info.energy_rate * 100.0).round() / 100.0,
+    let tray_number = match state.battery.state {
+        SerializableState(State::Full) => (state.battery.cpu_load * 10000.0).round() / 100.0,
+        _ => (state.battery.energy_rate * 100.0).round() / 100.0,
     };
-    let color = match state.info.state {
+    let color = match state.battery.state {
         SerializableState(State::Charging) => Rgb([0, 255, 0]),
         SerializableState(State::Discharging) => Rgb([255, 0, 0]),
         SerializableState(State::Full) => Rgb([255, 255, 0]),
@@ -101,14 +104,14 @@ async fn update_tray_icon(tray: &TrayIcon) {
     if result.is_err() {
         println!("tray.set_icon is err.{:?}", result);
     }
-    let tooltip = match state.info.state {
+    let tooltip = match state.battery.state {
         SerializableState(State::Charging) => format!(
             "Charging, estimated charging time {}",
-            format_duration(Duration::new(state.info.time_to_full_secs, 0))
+            format_duration(Duration::new(state.battery.time_to_full_secs, 0))
         ),
         SerializableState(State::Discharging) => format!(
             "Discharging, estimated charging time {}",
-            format_duration(Duration::new(state.info.time_to_empty_secs, 0))
+            format_duration(Duration::new(state.battery.time_to_empty_secs, 0))
         ),
         SerializableState(State::Full) => format!("Full, Cpu load {}%", tray_number),
         _ => "Battery Monitor".to_string(),
@@ -120,13 +123,26 @@ async fn update_tray_icon(tray: &TrayIcon) {
 }
 pub fn build(app: &App, id: &str) {
     let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>).unwrap();
-    let menu = Menu::with_items(app, &[&quit_i]).unwrap();
+    let admin_i =
+        MenuItem::with_id(app, "admin", "Run at Administrator", true, None::<&str>).unwrap();
+    //admin_i.set_enabled(!windows::is_admin()).unwrap();
+    let menu = Menu::with_items(app, &[&quit_i, &admin_i]).unwrap();
     let tray = TrayIconBuilder::with_id(id)
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "quit" => {
                 app.exit(0);
+            }
+            "admin" => {
+                if !windows::is_admin() {
+                    windows::elevate_self();
+                } else {
+                    match power::PowerInfo::new() {
+                        Ok(info) => app.app_handle().emit("power_info_updated", info).unwrap(),
+                        Err(_) => todo!(),
+                    }
+                }
             }
             _ => (),
         })
@@ -136,17 +152,7 @@ pub fn build(app: &App, id: &str) {
                 button_state: MouseButtonState::Up,
                 ..
             } => {
-                let app = tray.app_handle();
-                if let Some(window) = app.get_webview_window("main") {
-                    if window.is_minimized().unwrap() {
-                        let _ = window.unminimize();
-                    }
-                    if window.is_maximized().unwrap() {
-                        let _ = window.unmaximize();
-                    }
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
+                windows::active_window(tray.app_handle(), "main");
             }
             _ => (),
         })

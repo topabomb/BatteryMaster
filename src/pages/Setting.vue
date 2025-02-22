@@ -10,10 +10,11 @@
             >
           </q-item-section>
           <q-item-section side top>
-            <q-toggle color="red" v-model="form_value.auto_start" />
+            <q-toggle v-model="form_value.auto_start" />
           </q-item-section>
         </q-item>
         <q-separator spaced />
+        <!--
         <q-item tag="label" v-ripple>
           <q-item-section>
             <q-item-label>记录历史</q-item-label>
@@ -22,10 +23,11 @@
             >
           </q-item-section>
           <q-item-section side top>
-            <q-toggle color="red" v-model="form_value.record_battery_history" />
+            <q-toggle v-model="form_value.record_battery_history" />
           </q-item-section>
         </q-item>
         <q-separator spaced />
+        -->
         <q-item-label header class="text-grey-3">电池信息更新间隔</q-item-label>
         <q-item>
           <q-item-section side>

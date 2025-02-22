@@ -37,7 +37,7 @@ impl Default for Config {
 }
 
 // 获取当前执行目录
-fn get_exe_directory() -> PathBuf {
+pub fn get_exe_directory() -> PathBuf {
     env::current_exe()
         .expect("Failed to get current executable path")
         .parent()
@@ -46,7 +46,7 @@ fn get_exe_directory() -> PathBuf {
 }
 
 // 获取配置文件路径（基于执行文件目录）
-fn get_config_file_path() -> PathBuf {
+pub fn get_config_file_path() -> PathBuf {
     get_exe_directory().join("config.json")
 }
 
