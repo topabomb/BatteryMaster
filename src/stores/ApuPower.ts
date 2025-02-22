@@ -9,6 +9,7 @@ export interface LimitSet {
 }
 export interface FormValue extends LimitSet {
   auto_lock: boolean;
+  modifyed: boolean;
 }
 export interface PowerInfo extends LimitSet {
   table: number;
@@ -27,6 +28,7 @@ export const useStore = defineStore("ApuPower", {
     return {
       form_value: {
         auto_lock: false,
+        modifyed: false,
         stapm_limit: 12,
         slow_limit: 15,
         fast_limit: 15,

@@ -217,7 +217,9 @@
               icon="restart_alt"
               :loading="loading"
               @click="onReset"
-              :disable="btn_disabled || !modifyed || form_value.auto_lock"
+              :disable="
+                btn_disabled || !form_value.modifyed || form_value.auto_lock
+              "
             >
               <q-tooltip class="q-pa-none">
                 <q-list bordered separator>
@@ -282,7 +284,6 @@ import { useQuasar } from "quasar";
 const $q = useQuasar();
 const power_store = usePower();
 const sys_store = useSystem();
-const modifyed = ref(false);
 const loading = ref(false);
 const warn_dialog = ref(false);
 const enable_autolock = ref(false);
@@ -293,7 +294,7 @@ const previous_limit = ref({
 } as LimitSet);
 const setting_disabled = computed(() => {
   return (
-    (form_value.value.auto_lock && modifyed.value) ||
+    form_value.value.auto_lock ||
     !power_store.isAdmin ||
     !sys_store.support_power_set
   );
@@ -332,11 +333,11 @@ const onSubmit = async () => {
   if (form_value.value.fast_limit < form_value.value.stapm_limit)
     form_value.value.fast_limit = form_value.value.stapm_limit;
   await set_limit(form_value.value);
-  modifyed.value = true;
+  form_value.value.modifyed = true;
 };
 const onReset = async () => {
   await set_limit(previous_limit.value);
-  modifyed.value = false;
+  form_value.value.modifyed = false;
 };
 const form_value = ref(power_store.form_value);
 const exec_elevate_self = async () => {
