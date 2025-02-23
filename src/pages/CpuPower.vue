@@ -205,7 +205,7 @@
             <q-toggle
               v-model="form_value.auto_lock"
               @update:model-value="auto_lock_change"
-              :disable="!power_store.isAdmin || !enable_autolock"
+              :disable="!power_store.isAdmin || !form_value.modifyed"
             />
           </q-item-section>
         </q-item>

@@ -5,10 +5,10 @@ use crate::power;
 use crate::session;
 use crate::system;
 use crate::windows;
+use log::{log, Level};
 use tauri::Emitter;
 use tauri::{command, State};
 use tokio::sync::Mutex;
-
 #[command]
 pub async fn get_config(
     app_handle: tauri::AppHandle,
@@ -52,7 +52,8 @@ pub async fn get_powerinfo(
                     state.system.support_power_set = true;
                     val
                 }
-                Err(_) => {
+                Err(err) => {
+                    log!(Level::Warn, "command get_powerinfo err:{:?}", err);
                     state.system.support_power_set = false;
                     power::PowerInfo::default()
                 }

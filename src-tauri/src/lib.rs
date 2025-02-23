@@ -33,7 +33,7 @@ pub fn run() {
                         file_name: Some("BatteryMonitor".to_string()),
                     },
                 ))
-                .max_file_size(100_000 /* bytes */)
+                .max_file_size(1_000_000 /* bytes */)
                 .build(),
         )
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
@@ -78,23 +78,33 @@ pub fn run() {
                                 && state.system.support_power_set
                             {
                                 state.power_lock.lastcheck = now;
-                                let info = power::PowerInfo::new().unwrap();
-                                handler.emit("power_info_updated", &info).unwrap();
-                                let limit = state.power_lock.limit.clone();
-                                if info.fast_limit != limit.fast_limit
-                                    || info.slow_limit != limit.slow_limit
-                                    || info.stapm_limit != limit.stapm_limit
-                                {
-                                    match power::set_limit(&state.power_lock.limit) {
-                                        Ok(_) => {
-                                            let info = power::PowerInfo::new().unwrap();
-                                            log!(Level::Debug, "in loop,set_limit:{:?}", info);
-                                            handler.emit("power_info_updated", info).unwrap();
+                                let info = power::PowerInfo::new();
+                                if let Ok(val) = info {
+                                    let info = val;
+                                    handler.emit("power_info_updated", &info).unwrap();
+                                    let limit = state.power_lock.limit.clone();
+                                    if info.fast_limit != limit.fast_limit
+                                        || info.slow_limit != limit.slow_limit
+                                        || info.stapm_limit != limit.stapm_limit
+                                    {
+                                        match power::set_limit(&state.power_lock.limit) {
+                                            Ok(_) => {
+                                                let info = power::PowerInfo::new().unwrap();
+                                                log!(Level::Debug, "in loop,set_limit:{:?}", info);
+                                                handler.emit("power_info_updated", info).unwrap();
+                                            }
+                                            Err(err) => {
+                                                state.power_lock.enable = false;
+                                                log!(
+                                                    Level::Error,
+                                                    "in loop,set_limit err:{:?}",
+                                                    err
+                                                );
+                                            }
                                         }
-                                        Err(err) => {
-                                            state.power_lock.enable = false;
-                                            log!(Level::Error, "in loop,set_limit err:{:?}", err);
-                                        }
+                                    } else {
+                                        log!(Level::Warn, "loop power_lock get_powerinfo err.");
+                                        state.system.support_power_set = false;
                                     }
                                 }
                             }
