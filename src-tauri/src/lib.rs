@@ -102,10 +102,10 @@ pub fn run() {
                                                 );
                                             }
                                         }
-                                    } else {
-                                        log!(Level::Warn, "loop power_lock get_powerinfo err.");
-                                        state.system.support_power_set = false;
                                     }
+                                } else {
+                                    log!(Level::Warn, "loop power_lock get_powerinfo err.");
+                                    state.system.support_power_set = false;
                                 }
                             }
                         }
