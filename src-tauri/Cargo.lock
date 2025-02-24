@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "BatteryMonitor"
+name = "BatteryMaster"
 version = "0.1.1"
 dependencies = [
  "battery",

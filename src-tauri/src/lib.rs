@@ -30,7 +30,7 @@ pub fn run() {
                 .target(tauri_plugin_log::Target::new(
                     tauri_plugin_log::TargetKind::Folder {
                         path: config::get_exe_directory(),
-                        file_name: Some("BatteryMonitor".to_string()),
+                        file_name: Some("logs".to_string()),
                     },
                 ))
                 .max_file_size(1_000_000 /* bytes */)

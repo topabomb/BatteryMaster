@@ -1,7 +1,7 @@
 [package]
-name = "BatteryMonitor"
+name = "BatteryMaster"
 version = "0.1.1"
-description = "BatteryMonitor"
+description = "BatteryMaster"
 authors = ["topabomb"]
 edition = "2021"
 
