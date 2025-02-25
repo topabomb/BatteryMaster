@@ -101,6 +101,11 @@ impl Default for BatteryInfo {
         }
     }
 }
+impl BatteryInfo {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
 #[derive(Clone)]
 pub struct Battery {
     pub current: Result<BatteryInfo, ()>,

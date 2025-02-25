@@ -13,6 +13,17 @@
             <q-toggle v-model="form_value.auto_start" />
           </q-item-section>
         </q-item>
+        <q-item tag="label" v-ripple>
+          <q-item-section>
+            <q-item-label>最小化启动</q-item-label>
+            <q-item-label caption class="text-grey-5"
+              >启动时最小化到任务栏</q-item-label
+            >
+          </q-item-section>
+          <q-item-section side top>
+            <q-toggle v-model="form_value.start_minimize" />
+          </q-item-section>
+        </q-item>
         <q-separator spaced />
         <!--
         <q-item tag="label" v-ripple>
@@ -28,7 +39,7 @@
         </q-item>
         <q-separator spaced />
         -->
-        <q-item-label header class="text-grey-3">电池信息更新间隔</q-item-label>
+        <q-item-label header class="text-grey-3">后台更新间隔</q-item-label>
         <q-item>
           <q-item-section side>
             <q-icon color="primary" name="schedule" size="md" />
@@ -43,14 +54,14 @@
             />
           </q-item-section>
         </q-item>
-        <q-item-label header class="text-grey-3">任务栏更新间隔</q-item-label>
+        <q-item-label header class="text-grey-3">界面更新间隔</q-item-label>
         <q-item>
           <q-item-section side>
             <q-icon color="primary" name="schedule" size="md" />
           </q-item-section>
           <q-item-section>
             <q-slider
-              v-model="form_value.tray_icon_update"
+              v-model="form_value.ui_update"
               :min="1"
               :inner-min="form_value.service_update"
               :max="5"

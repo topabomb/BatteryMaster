@@ -222,7 +222,7 @@
               "
             >
               <q-tooltip class="q-pa-none">
-                <q-list bordered separator>
+                <q-list bordered separator v-if="!!power_store.init_value">
                   <q-item dense>
                     <q-item-section>
                       <q-item-label
@@ -234,7 +234,7 @@
                     <q-item-section avatar>stapm_limit</q-item-section>
                     <q-item-section
                       ><q-item-label>{{
-                        previous_limit.stapm_limit
+                        power_store.init_value!.stapm_limit
                       }}</q-item-label></q-item-section
                     >
                   </q-item>
@@ -242,7 +242,7 @@
                     <q-item-section avatar>slow_limit</q-item-section>
                     <q-item-section
                       ><q-item-label>{{
-                        previous_limit.slow_limit
+                        power_store.init_value!.slow_limit
                       }}</q-item-label></q-item-section
                     >
                   </q-item>
@@ -250,7 +250,7 @@
                     <q-item-section avatar>fast_limit</q-item-section>
                     <q-item-section
                       ><q-item-label>{{
-                        previous_limit.fast_limit
+                        power_store.init_value!.fast_limit
                       }}</q-item-label></q-item-section
                     >
                   </q-item>
@@ -287,11 +287,7 @@ const sys_store = useSystem();
 const loading = ref(false);
 const warn_dialog = ref(false);
 const enable_autolock = ref(false);
-const previous_limit = ref({
-  stapm_limit: power_store.stapm_limit,
-  slow_limit: power_store.slow_limit,
-  fast_limit: power_store.fast_limit,
-} as LimitSet);
+
 const setting_disabled = computed(() => {
   return (
     form_value.value.auto_lock ||
@@ -336,8 +332,10 @@ const onSubmit = async () => {
   form_value.value.modifyed = true;
 };
 const onReset = async () => {
-  await set_limit(previous_limit.value);
-  form_value.value.modifyed = false;
+  if (power_store.init_value) {
+    await set_limit(power_store.init_value);
+    form_value.value.modifyed = false;
+  }
 };
 const form_value = ref(power_store.form_value);
 const exec_elevate_self = async () => {
@@ -348,16 +346,4 @@ const auto_lock_change = async () => {
     ...form_value.value,
   } as LimitSet);
 };
-
-let timeOutHandle: NodeJS.Timeout;
-const refresh = async () => {
-  await power_store.refresh();
-  timeOutHandle = setTimeout(refresh, 2000);
-};
-onMounted(() => {
-  refresh().then();
-});
-onUnmounted(() => {
-  if (timeOutHandle) clearTimeout(timeOutHandle);
-});
 </script>

@@ -6,7 +6,6 @@ use crate::session;
 use crate::system;
 use crate::windows;
 use log::{log, Level};
-use tauri::Emitter;
 use tauri::{command, State};
 use tokio::sync::Mutex;
 #[command]
@@ -36,8 +35,8 @@ pub async fn get_isadmin(
     app_handle: tauri::AppHandle,
     state: State<'_, Arc<Mutex<session::SessionState>>>,
 ) -> Result<bool, ()> {
-    //let state = state.lock().await;
-    Ok(windows::is_admin())
+    let state = state.lock().await;
+    Ok(state.is_admin)
 }
 #[command]
 pub async fn get_powerinfo(
@@ -45,22 +44,20 @@ pub async fn get_powerinfo(
     state: State<'_, Arc<Mutex<session::SessionState>>>,
 ) -> Result<power::PowerInfo, ()> {
     let mut state = state.lock().await;
-    Ok(
-        match windows::is_admin() && state.system.support_power_set {
-            true => match power::PowerInfo::new() {
-                Ok(val) => {
-                    state.system.support_power_set = true;
-                    val
-                }
-                Err(err) => {
-                    log!(Level::Warn, "command get_powerinfo err:{:?}", err);
-                    state.system.support_power_set = false;
-                    power::PowerInfo::default()
-                }
-            },
-            false => power::PowerInfo::default(),
+    Ok(match state.is_admin && state.system.support_power_set {
+        true => match power::PowerInfo::new() {
+            Ok(val) => {
+                state.system.support_power_set = true;
+                val
+            }
+            Err(err) => {
+                log!(Level::Warn, "command get_powerinfo err:{:?}", err);
+                state.system.support_power_set = false;
+                power::PowerInfo::default()
+            }
         },
-    )
+        false => power::PowerInfo::default(),
+    })
 }
 
 #[command]
@@ -68,7 +65,11 @@ pub async fn exec_elevate_self(
     app_handle: tauri::AppHandle,
     state: State<'_, Arc<Mutex<session::SessionState>>>,
 ) -> Result<bool, ()> {
-    windows::elevate_self();
+    let state = state.lock().await;
+    if !state.is_admin {
+        windows::elevate_self();
+    }
+
     Ok(true)
 }
 #[command]
@@ -77,27 +78,28 @@ pub async fn set_power_limit(
     state: State<'_, Arc<Mutex<session::SessionState>>>,
     limit: power::PowerLimit,
 ) -> Result<(bool, Option<power::PowerInfo>), ()> {
-    let state = state.lock().await;
-    Ok(
-        match windows::is_admin() && state.system.support_power_set {
-            true => match power::set_limit(&limit) {
-                Ok(_) => {
-                    let info = power::PowerInfo::new().unwrap();
-                    app_handle.emit("power_info_updated", &info).unwrap();
-                    if info.stapm_limit == limit.stapm_limit
-                        && info.slow_limit == limit.slow_limit
-                        && info.fast_limit == limit.fast_limit
-                    {
-                        (true, Some(info))
-                    } else {
-                        (false, Some(info))
-                    }
-                }
-                Err(_) => (false, None),
-            },
-            false => (false, None),
-        },
-    )
+    let mut state = state.lock().await;
+    if !state.is_admin || !state.system.support_power_set {
+        return Ok((false, None));
+    }
+    let result = match power::set_limit(&limit) {
+        Ok(_) => {
+            state.power = power::PowerInfo::new().unwrap();
+            if state.power.stapm_limit == limit.stapm_limit
+                && state.power.slow_limit == limit.slow_limit
+                && state.power.fast_limit == limit.fast_limit
+            {
+                (true, Some(state.power.clone()))
+            } else {
+                (false, Some(state.power.clone()))
+            }
+        }
+        Err(_) => (false, None),
+    };
+    if result.0 {
+        session::EventChannel::emit_ui_update(&app_handle, &state).await;
+    }
+    Ok(result)
 }
 #[command]
 pub async fn get_system(
@@ -113,13 +115,24 @@ pub async fn set_power_limit_lock(
     state: State<'_, Arc<Mutex<session::SessionState>>>,
     lock: bool,
     limit: power::PowerLimit,
-) -> Result<(bool), ()> {
+) -> Result<bool, ()> {
     let mut state = state.lock().await;
-    if windows::is_admin() && state.system.support_power_set {
+    if state.is_admin && state.system.support_power_set {
         state.power_lock.enable = lock;
         state.power_lock.limit = limit;
         Ok(true)
     } else {
         Ok(false)
     }
+}
+
+#[tauri::command]
+pub async fn set_event_channel(
+    app_handle: tauri::AppHandle,
+    state: State<'_, Arc<Mutex<session::SessionState>>>,
+    setting: session::EventChannel,
+) -> Result<bool, ()> {
+    let mut state = state.lock().await;
+    state.channel = setting;
+    Ok(true)
 }

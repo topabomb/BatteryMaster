@@ -20,7 +20,8 @@ fn check_if_dev() -> bool {
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct Config {
     pub auto_start: bool,             // 系统启动时自动启动
-    pub tray_icon_update: u8,         // 托盘图标更新时间
+    pub start_minimize: bool,         //启动时最小化
+    pub ui_update: u8,                // UI标更新时间
     pub service_update: u8,           // 监控服务更新时间
     pub record_battery_history: bool, // 是否记录电池活动历史
 }
@@ -29,7 +30,8 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             auto_start: false,
-            tray_icon_update: 2,
+            start_minimize: true,
+            ui_update: 2,
             service_update: 1,
             record_battery_history: false,
         }

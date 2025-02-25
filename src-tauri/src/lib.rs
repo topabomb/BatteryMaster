@@ -1,15 +1,14 @@
-use battery::BatteryInfo;
 use log::{log, Level};
-use std::panic;
 use std::sync::Arc;
 use std::time::SystemTime;
-use system::SystemInfo;
-use tauri::{Emitter, Manager};
+use std::{env, panic};
+use tauri::Manager;
 use tauri_plugin_autostart::MacosLauncher;
-use tokio::sync::Mutex;
+use tokio::sync::{oneshot, Mutex};
+use tokio::task;
 use tokio::time::{sleep, Duration};
 mod battery;
-mod commands; // 引入命令模块
+mod commands;
 mod config;
 mod power;
 mod session;
@@ -18,10 +17,13 @@ mod tray;
 mod windows;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    const TRAY_ID: &str = "main";
+    let args: Vec<String> = env::args().collect();
+    let is_autostart = args.contains(&"--autostart".to_string());
+    let is_adminstart = args.contains(&"--adminstart".to_string());
+
     panic::set_hook(Box::new(|info| {
-        // 这里你可以自定义 panic 处理逻辑
-        println!("A panic occurred: {:?}", info);
-        // 可以选择直接退出进程（如果你希望发生 panic 时退出）
+        log!(Level::Error, "A panic occurred: {:?}", info);
         std::process::exit(1); // 可以替换为你希望的退出代码
     }));
     tauri::Builder::default()
@@ -37,51 +39,70 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
-            windows::active_window(app, "main");
+            windows::active_window_change_state(app, "main");
         }))
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
-            Some(vec!["--flag1", "--flag2"]),
+            Some(vec!["--autostart"]),
         ))
-        .setup(|app| {
+        .setup(move |app| {
+            log!(Level::Debug, "args ={:?}", args);
+
             let config = config::load_config().expect("load_config err.");
-            app.manage(Arc::new(Mutex::new(session::SessionState {
-                config,
-                battery: BatteryInfo::default(),
-                system: SystemInfo::new(),
-                power_lock: power::PowerLock::default(),
-            })));
+            app.manage(Arc::new(Mutex::new(session::SessionState::new(config))));
+            if is_adminstart {
+                windows::active_window(app.handle(), "main");
+            }
+
             config::set_autostart(app.app_handle(), config.auto_start);
-            tray::build(app, "main");
+            tray::build(app, TRAY_ID);
+            if config.start_minimize {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.close().unwrap();
+                }
+            }
             let bms = Arc::new(Mutex::new(battery::Battery::new()));
             battery::Battery::start(bms.clone(), 1);
             let bms_clone = Arc::clone(&bms);
-            let handler = app.handle().clone();
+            let handler1 = app.handle().clone();
+            let handler2 = app.handle().clone();
+            let (tx, rx) = oneshot::channel::<()>();
+            //service update.
             tokio::spawn(async move {
+                let mut tx = Some(tx); // 将 tx 包装成 Option，以便在第一次发送后取出
                 loop {
                     let mut secs = 1;
                     {
-                        let state = handler.state::<Arc<Mutex<session::SessionState>>>();
+                        let state = handler1.state::<Arc<Mutex<session::SessionState>>>();
                         let mut state = state.lock().await;
                         let info = bms_clone.lock().await.current.clone().unwrap();
+                        //battery
                         state.battery = info.clone();
-                        handler.emit("battery_info_updated", info).unwrap();
-                        secs = state.config.service_update;
-
+                        //power
+                        if state.is_admin && state.system.support_power_set {
+                            state.power = match power::PowerInfo::new() {
+                                Ok(v) => v,
+                                Err(_) => {
+                                    log!(Level::Warn, "loop power_lock get_powerinfo err.");
+                                    state.system.support_power_set = false;
+                                    power::PowerInfo::default()
+                                }
+                            };
+                        }
+                        //power_lock
                         if state.power_lock.enable {
                             let now = SystemTime::now()
                                 .duration_since(SystemTime::UNIX_EPOCH)
                                 .unwrap()
                                 .as_secs();
                             if now - state.power_lock.lastcheck > 10
-                                && windows::is_admin()
+                                && state.is_admin
                                 && state.system.support_power_set
                             {
                                 state.power_lock.lastcheck = now;
                                 let info = power::PowerInfo::new();
                                 if let Ok(val) = info {
                                     let info = val;
-                                    handler.emit("power_info_updated", &info).unwrap();
                                     let limit = state.power_lock.limit.clone();
                                     if info.fast_limit != limit.fast_limit
                                         || info.slow_limit != limit.slow_limit
@@ -91,7 +112,6 @@ pub fn run() {
                                             Ok(_) => {
                                                 let info = power::PowerInfo::new().unwrap();
                                                 log!(Level::Debug, "in loop,set_limit:{:?}", info);
-                                                handler.emit("power_info_updated", info).unwrap();
                                             }
                                             Err(err) => {
                                                 state.power_lock.enable = false;
@@ -109,6 +129,31 @@ pub fn run() {
                                 }
                             }
                         }
+                        session::EventChannel::emit_service_update(&handler1, &state).await;
+                        secs = state.config.service_update;
+                    }
+                    if let Some(t) = tx.take() {
+                        let _ = t.send(()).map_err(|_| ());
+                    }
+                    sleep(Duration::from_secs(secs as u64)).await;
+                }
+            });
+            //ui update.
+            tokio::spawn(async move {
+                let mut rx = Some(rx); // 将 tx 包装成 Option，以便在第一次发送后取出
+                loop {
+                    if let Some(rx) = rx.take() {
+                        let _ = rx.await;
+                    }
+                    let tary = handler2.tray_by_id(TRAY_ID).unwrap();
+                    tray::update_tray_icon(&tary).await;
+                    let mut secs = 1;
+                    {
+                        let state = handler2.state::<Arc<Mutex<session::SessionState>>>();
+                        let state = state.lock().await;
+                        secs = state.config.ui_update;
+
+                        session::EventChannel::emit_ui_update(&handler2, &state).await;
                     }
                     sleep(Duration::from_secs(secs as u64)).await;
                 }
@@ -125,11 +170,25 @@ pub fn run() {
             commands::set_power_limit,
             commands::set_power_limit_lock,
             commands::get_system,
+            commands::set_event_channel,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 window.hide().unwrap();
+
+                let handler = window.app_handle();
+                let state: tauri::State<'_, Arc<Mutex<session::SessionState>>> =
+                    handler.state::<Arc<Mutex<session::SessionState>>>();
+
+                // 将 state 转移到异步任务中
+                tokio::spawn({
+                    let state = Arc::clone(&state); // 克隆 Arc 以便传递给异步任务
+                    async move {
+                        let mut state = state.lock().await; // 异步地获取 Mutex 锁
+                        state.is_min_tray = true; // 修改状态
+                    }
+                });
             }
         })
         .run(tauri::generate_context!())

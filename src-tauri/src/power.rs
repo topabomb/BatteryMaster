@@ -34,6 +34,11 @@ impl Default for PowerLock {
         }
     }
 }
+impl PowerLock {
+    pub fn new() -> Self {
+        PowerLock::default()
+    }
+}
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PowerInfo {
     pub table: i32,

@@ -1,4 +1,9 @@
+use std::sync::Arc;
+
 use tauri::{AppHandle, Manager};
+use tokio::sync::Mutex;
+
+use crate::session;
 
 #[cfg(windows)]
 pub fn is_admin() -> bool {
@@ -48,9 +53,11 @@ pub fn elevate_self() {
         .collect::<Vec<u16>>();
 
     let verb: Vec<u16> = "runas\0".encode_utf16().collect();
-    let params = std::env::args()
-        .skip(1)
-        .collect::<Vec<_>>()
+    // 获取当前的命令行参数，并将 `--adminstart` 加入其中
+    let mut params = std::env::args().skip(1).collect::<Vec<_>>(); // 获取原有的命令行参数
+    params.push("--adminstart".to_string()); // 添加 `--adminstart` 参数
+
+    let params_str = params
         .join(" ")
         .encode_utf16()
         .chain(iter::once(0))
@@ -61,7 +68,7 @@ pub fn elevate_self() {
             std::ptr::null_mut(),
             verb.as_ptr(),
             os_str.as_ptr(),
-            params.as_ptr(),
+            params_str.as_ptr(),
             std::ptr::null(),
             SW_SHOW,
         );
@@ -73,7 +80,6 @@ pub fn elevate_self() {
 }
 #[cfg(not(windows))]
 pub fn elevate_self() {}
-
 pub fn active_window(app: &AppHandle, name: &str) {
     if let Some(window) = app.get_webview_window(name) {
         if window.is_minimized().unwrap() {
@@ -85,4 +91,16 @@ pub fn active_window(app: &AppHandle, name: &str) {
         window.show().unwrap();
         window.set_focus().unwrap();
     }
+}
+pub fn active_window_change_state(app: &AppHandle, name: &str) {
+    active_window(app, name);
+    let state = app.state::<Arc<Mutex<session::SessionState>>>();
+    // 将 state 转移到异步任务中
+    tokio::spawn({
+        let state = Arc::clone(&state); // 克隆 Arc 以便传递给异步任务
+        async move {
+            let mut state = state.lock().await; // 异步地获取 Mutex 锁
+            state.is_min_tray = false; // 修改状态
+        }
+    });
 }

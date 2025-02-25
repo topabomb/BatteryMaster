@@ -1,14 +1,11 @@
 use crate::battery::SerializableState;
-use crate::power;
 use crate::session;
 use crate::windows;
 use ::battery::State;
 use humantime::format_duration;
 use image::{ExtendedColorType, ImageBuffer, ImageEncoder, Rgb, Rgba};
-use libapuadj;
 use rusttype::{Font, Scale};
 use std::{error::Error, sync::Arc};
-use tauri::Emitter;
 use tauri::{
     image::Image as TauriImage,
     menu::{Menu, MenuItem},
@@ -16,7 +13,8 @@ use tauri::{
     App, Manager,
 };
 use tokio::sync::Mutex;
-use tokio::time::{sleep, Duration};
+use tokio::task;
+use tokio::time::Duration;
 fn generate_tray_icon(
     text_color: Rgb<u8>,
     number: i32,
@@ -83,7 +81,7 @@ fn generate_tray_icon(
 
     Ok(buffer)
 }
-async fn update_tray_icon(tray: &TrayIcon) {
+pub async fn update_tray_icon(tray: &TrayIcon) {
     let state = tray
         .app_handle()
         .state::<Arc<Mutex<session::SessionState>>>();
@@ -125,7 +123,7 @@ pub fn build(app: &App, id: &str) {
     let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>).unwrap();
     let admin_i =
         MenuItem::with_id(app, "admin", "Run at Administrator", true, None::<&str>).unwrap();
-    admin_i.set_enabled(!windows::is_admin()).unwrap();
+
     let menu = Menu::with_items(app, &[&admin_i, &quit_i]).unwrap();
     let tray = TrayIconBuilder::with_id(id)
         .menu(&menu)
@@ -135,9 +133,17 @@ pub fn build(app: &App, id: &str) {
                 app.exit(0);
             }
             "admin" => {
-                if !windows::is_admin() {
-                    windows::elevate_self();
-                }
+                let state = app.state::<Arc<Mutex<session::SessionState>>>();
+                // 将 state 转移到异步任务中
+                tokio::spawn({
+                    let state = Arc::clone(&state); // 克隆 Arc 以便传递给异步任务
+                    async move {
+                        let state = state.lock().await; // 异步地获取 Mutex 锁
+                        if !state.is_admin {
+                            windows::elevate_self();
+                        }
+                    }
+                });
             }
             _ => (),
         })
@@ -147,24 +153,10 @@ pub fn build(app: &App, id: &str) {
                 button_state: MouseButtonState::Up,
                 ..
             } => {
-                windows::active_window(tray.app_handle(), "main");
+                windows::active_window_change_state(tray.app_handle(), "main");
             }
             _ => (),
         })
         .build(app)
         .unwrap();
-    tokio::spawn(async move {
-        loop {
-            let mut secs = 1;
-            {
-                update_tray_icon(&tray).await;
-                let state = tray
-                    .app_handle()
-                    .state::<Arc<Mutex<session::SessionState>>>();
-                let state = state.lock().await;
-                secs = state.config.tray_icon_update;
-            }
-            sleep(Duration::from_secs(secs as u64)).await;
-        }
-    });
 }

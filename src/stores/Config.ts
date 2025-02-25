@@ -2,7 +2,8 @@ import { defineStore } from "pinia";
 import { invoke } from "@tauri-apps/api/core";
 export interface Config {
   auto_start: boolean;
-  tray_icon_update: number;
+  start_minimize: boolean;
+  ui_update: number;
   service_update: number;
   record_battery_history: boolean;
 }
@@ -10,7 +11,8 @@ export const useStore = defineStore("Config", {
   state: (): Config => {
     return {
       auto_start: false,
-      tray_icon_update: 2,
+      start_minimize: true,
+      ui_update: 2,
       service_update: 1,
       record_battery_history: true,
     };

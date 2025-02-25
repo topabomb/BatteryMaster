@@ -3,6 +3,8 @@
     <q-header class="text-white">
       <q-bar data-tauri-drag-region>
         <q-tabs
+          v-model="tab"
+          @update:model-value="tabChanged"
           dense
           stretch
           shrink
@@ -47,6 +49,8 @@
 </template>
 <script setup lang="ts">
 import { useQuasar } from "quasar";
+import { invoke } from "@tauri-apps/api/core";
+import { warn, debug, error } from "@tauri-apps/plugin-log";
 import { formatDuration, intervalToDuration } from "date-fns";
 import { onMounted, computed, ref } from "vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -55,6 +59,7 @@ import { useRouter } from "vue-router";
 import { useStore as useConfig, Config } from "./stores/Config";
 import { useStore as usePower, ApuPower } from "./stores/ApuPower";
 import { useStore as useSystem } from "./stores/SystemInfo";
+import router from "./router";
 
 const config_store = useConfig();
 config_store.load().then();
@@ -132,10 +137,48 @@ const state_icon = computed(() => {
       return "battery_unknown";
   }
 });
-const router = useRouter();
+let tab = ref("");
 onMounted(() => {
   router.push("/monitor");
 });
+const tabChanged = async (nval: string) => {
+  if (!nval) return;
+  let result: boolean = false;
+  let param = {
+    battery: true,
+    system: false,
+    power: false,
+    config: false,
+    log: false,
+    history: false,
+  };
+  switch (nval) {
+    case "monitor":
+      result = (await invoke("set_event_channel", {
+        setting: { ...param },
+      })) as boolean;
+      break;
+    case "history":
+      result = (await invoke("set_event_channel", {
+        setting: { ...param, history: true },
+      })) as boolean;
+      break;
+    case "cpupower":
+      result = (await invoke("set_event_channel", {
+        setting: { ...param, power: true },
+      })) as boolean;
+      break;
+    case "setting":
+      result = (await invoke("set_event_channel", {
+        setting: { ...param, config: true },
+      })) as boolean;
+      break;
+    default:
+      break;
+  }
+  debug(`ui tab change to ${tab.value},call set_event_channel is ${result}`);
+};
+
 const minimize = () => {
   getCurrentWindow().minimize();
 };
