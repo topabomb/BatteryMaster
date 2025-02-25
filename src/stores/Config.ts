@@ -11,7 +11,7 @@ export const useStore = defineStore("Config", {
   state: (): Config => {
     return {
       auto_start: false,
-      start_minimize: true,
+      start_minimize: false,
       ui_update: 2,
       service_update: 1,
       record_battery_history: true,
