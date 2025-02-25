@@ -6,7 +6,7 @@ The Battery Master is a small tool developed using Rust. It allows you to monito
 
 # History
 
-## 0.1.1
+## 0.1.2
 
 Added processor power viewing and limiting features, now supporting locking the processor power consumption limit.
 
