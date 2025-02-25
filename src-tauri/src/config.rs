@@ -30,7 +30,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             auto_start: false,
-            start_minimize: true,
+            start_minimize: false,
             ui_update: 2,
             service_update: 1,
             record_battery_history: false,
