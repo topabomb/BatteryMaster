@@ -128,11 +128,8 @@ pub fn run() {
                             && state.system.support_power_set
                         {
                             let now = Utc::now().timestamp();
-                            if now - state.power_lock.lastcheck > 10
-                                && state.is_admin
-                                && state.system.support_power_set
-                                && state.power.is_some()
-                            {
+                            if now - state.power_lock.lastcheck > 10 && state.power.is_some() {
+                                state.power_lock.lastcheck = now;
                                 let limit = state.power_lock.limit.clone();
                                 if let Some(info) = state.power.as_mut() {
                                     info.last();

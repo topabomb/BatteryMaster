@@ -58,7 +58,8 @@
       dense
       class="text-white bg-warning"
       v-show="sys_store.support_power_set && power_store.isAdmin"
-      >该功能仅在支持的amd cpu上可用，也可能破坏您的计算机硬件,请谨慎使用；{{
+      >该功能仅在支持的amd
+      cpu(zen2+)上可用，也可能破坏您的计算机硬件,请谨慎使用；{{
     }}</q-banner>
 
     <q-form @submit="onSubmit" :loading="loading">

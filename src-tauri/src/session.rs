@@ -96,7 +96,13 @@ impl SessionState {
             channel: EventChannel::new(),
             power: match system.support_power_set && is_admin {
                 true => match power::Status::build() {
-                    Some(val) => Some(val),
+                    Some(val) => {
+                        //>zen2
+                        if val.identifier.cpu_family > 2 && val.identifier.cpu_family < 12 {
+                            system.support_power_set = true;
+                        }
+                        Some(val)
+                    }
                     None => {
                         system.support_power_set = false;
                         None

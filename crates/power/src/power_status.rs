@@ -3,7 +3,7 @@ use libapuadj::ryzen_access;
 use serde::{Deserialize, Serialize};
 use status::{Last, Status as BaseStatus};
 #[derive(Serialize, Deserialize, Clone, Debug)]
-struct Identifier {
+pub struct Identifier {
     pub cpu_family: i32,
 }
 impl Default for Identifier {
