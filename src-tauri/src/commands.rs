@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use crate::config;
-use crate::power;
 use crate::session;
-use crate::system;
 use crate::windows;
 use log::{log, Level};
+use status::{Last, Status};
+use system::*;
 use tauri::{command, State};
 use tokio::sync::Mutex;
 #[command]
@@ -42,22 +42,17 @@ pub async fn get_isadmin(
 pub async fn get_powerinfo(
     app_handle: tauri::AppHandle,
     state: State<'_, Arc<Mutex<session::SessionState>>>,
-) -> Result<power::PowerInfo, ()> {
+) -> Result<power::Status, String> {
     let mut state = state.lock().await;
-    Ok(match state.is_admin && state.system.support_power_set {
-        true => match power::PowerInfo::new() {
-            Ok(val) => {
-                state.system.support_power_set = true;
-                val
-            }
-            Err(err) => {
-                log!(Level::Warn, "command get_powerinfo err:{:?}", err);
-                state.system.support_power_set = false;
-                power::PowerInfo::default()
-            }
-        },
-        false => power::PowerInfo::default(),
-    })
+    if state.is_admin && state.system.support_power_set && state.power.is_some() {
+        let info = state.power.as_mut().unwrap();
+        info.last();
+        Ok(info.clone())
+    } else {
+        log!(Level::Warn, "command get_powerinfo err.");
+        state.system.support_power_set = false;
+        Err("get_powerinfo err.".to_string())
+    }
 }
 
 #[command]
@@ -77,21 +72,22 @@ pub async fn set_power_limit(
     app_handle: tauri::AppHandle,
     state: State<'_, Arc<Mutex<session::SessionState>>>,
     limit: power::PowerLimit,
-) -> Result<(bool, Option<power::PowerInfo>), ()> {
+) -> Result<(bool, Option<power::Status>), ()> {
     let mut state = state.lock().await;
-    if !state.is_admin || !state.system.support_power_set {
+    if !state.is_admin || !state.system.support_power_set || state.power.is_none() {
         return Ok((false, None));
     }
     let result = match power::set_limit(&limit) {
         Ok(_) => {
-            state.power = power::PowerInfo::new().unwrap();
-            if state.power.stapm_limit == limit.stapm_limit
-                && state.power.slow_limit == limit.slow_limit
-                && state.power.fast_limit == limit.fast_limit
+            let info = state.power.as_mut().unwrap();
+            info.last();
+            if info.stapm_limit == limit.stapm_limit
+                && info.slow_limit == limit.slow_limit
+                && info.fast_limit == limit.fast_limit
             {
-                (true, Some(state.power.clone()))
+                (true, Some(info.clone()))
             } else {
-                (false, Some(state.power.clone()))
+                (false, Some(info.clone()))
             }
         }
         Err(_) => (false, None),
@@ -105,7 +101,7 @@ pub async fn set_power_limit(
 pub async fn get_system(
     app_handle: tauri::AppHandle,
     state: State<'_, Arc<Mutex<session::SessionState>>>,
-) -> Result<system::SystemInfo, ()> {
+) -> Result<system_status::Status, ()> {
     let state = state.lock().await;
     Ok(state.system.clone())
 }

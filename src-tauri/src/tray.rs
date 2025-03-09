@@ -1,7 +1,5 @@
-use crate::battery::SerializableState;
 use crate::session;
 use crate::windows;
-use ::battery::State;
 use humantime::format_duration;
 use image::{ExtendedColorType, ImageBuffer, ImageEncoder, Rgb, Rgba};
 use rusttype::{Font, Scale};
@@ -13,7 +11,6 @@ use tauri::{
     App, Manager,
 };
 use tokio::sync::Mutex;
-use tokio::task;
 use tokio::time::Duration;
 fn generate_tray_icon(
     text_color: Rgb<u8>,
@@ -85,35 +82,44 @@ pub async fn update_tray_icon(tray: &TrayIcon) {
     let state = tray
         .app_handle()
         .state::<Arc<Mutex<session::SessionState>>>();
-    let state = state.lock().await;
-    let tray_number = match state.battery.state {
-        SerializableState(State::Full) => (state.battery.cpu_load * 10000.0).round() / 100.0,
-        _ => (state.battery.energy_rate * 100.0).round() / 100.0,
-    };
-    let color = match state.battery.state {
-        SerializableState(State::Charging) => Rgb([0, 255, 0]),
-        SerializableState(State::Discharging) => Rgb([255, 0, 0]),
-        SerializableState(State::Full) => Rgb([255, 255, 0]),
-        _ => Rgb([255, 255, 255]),
-    };
-
+    let mut state = state.lock().await;
+    let mut tray_number = (state.system.cpuload * 10000.0).round() / 100.0;
+    let mut color = Rgb([255, 255, 0]);
+    let mut tooltip: String = String::from("Unknown");
+    if let Some(battery) = &state.battery {
+        match battery.state {
+            battery::State(battery::ExternalBatteryState::Charging)
+            | battery::State(battery::ExternalBatteryState::Discharging) => {
+                tray_number = (battery.energy_rate * 100.0).round() / 100.0;
+            }
+            _ => (),
+        };
+        match battery.state {
+            battery::State(battery::ExternalBatteryState::Charging) => color = Rgb([0, 255, 0]),
+            battery::State(battery::ExternalBatteryState::Discharging) => color = Rgb([255, 0, 0]),
+            _ => (),
+        };
+        tooltip = match battery.state {
+            battery::State(battery::ExternalBatteryState::Charging) => format!(
+                "Charging, estimated charging time {}",
+                format_duration(Duration::new(battery.time_to_full_secs, 0))
+            ),
+            battery::State(battery::ExternalBatteryState::Discharging) => format!(
+                "Discharging, estimated charging time {}",
+                format_duration(Duration::new(battery.time_to_empty_secs, 0))
+            ),
+            battery::State(battery::ExternalBatteryState::Full) => {
+                format!("Full, Cpu load {}%", tray_number)
+            }
+            _ => "Battery Monitor".to_string(),
+        };
+    }
     let icon_bytes = generate_tray_icon(color, tray_number.abs() as i32).unwrap();
     let result = tray.set_icon(TauriImage::from_bytes(&icon_bytes).ok());
     if result.is_err() {
         println!("tray.set_icon is err.{:?}", result);
     }
-    let tooltip = match state.battery.state {
-        SerializableState(State::Charging) => format!(
-            "Charging, estimated charging time {}",
-            format_duration(Duration::new(state.battery.time_to_full_secs, 0))
-        ),
-        SerializableState(State::Discharging) => format!(
-            "Discharging, estimated charging time {}",
-            format_duration(Duration::new(state.battery.time_to_empty_secs, 0))
-        ),
-        SerializableState(State::Full) => format!("Full, Cpu load {}%", tray_number),
-        _ => "Battery Monitor".to_string(),
-    };
+
     let result = tray.set_tooltip(Some(tooltip));
     if result.is_err() {
         println!("tray.set_tooltip err.{:?}", result);
@@ -125,7 +131,7 @@ pub fn build(app: &App, id: &str) {
         MenuItem::with_id(app, "admin", "Run at Administrator", true, None::<&str>).unwrap();
 
     let menu = Menu::with_items(app, &[&admin_i, &quit_i]).unwrap();
-    let tray = TrayIconBuilder::with_id(id)
+    TrayIconBuilder::with_id(id)
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -153,7 +159,16 @@ pub fn build(app: &App, id: &str) {
                 button_state: MouseButtonState::Up,
                 ..
             } => {
-                windows::active_window_change_state(tray.app_handle(), "main");
+                let app = tray.app_handle();
+                windows::active_window(app, "main");
+                let state = app.state::<Arc<Mutex<session::SessionState>>>();
+                tokio::spawn({
+                    let state = Arc::clone(&state);
+                    async move {
+                        let mut state = state.lock().await; // 异步地获取 Mutex 锁
+                        state.is_min_tray = false; // 修改状态
+                    }
+                });
             }
             _ => (),
         })

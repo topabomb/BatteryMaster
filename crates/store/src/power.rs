@@ -1,7 +1,10 @@
-use std::time::SystemTime;
+use chrono::prelude::*;
 
+use polars::{frame::DataFrame, prelude::*};
 use raw_cpuid::CpuId;
 use serde::{Deserialize, Serialize};
+
+use crate::dataframe;
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct PowerLimit {
     pub stapm_limit: f32,
@@ -17,20 +20,18 @@ impl Default for PowerLimit {
         }
     }
 }
+
 pub struct PowerLock {
     pub limit: PowerLimit,
     pub enable: bool,
-    pub lastcheck: u64,
+    pub lastcheck: i64,
 }
 impl Default for PowerLock {
     fn default() -> Self {
         Self {
             limit: Default::default(),
             enable: false,
-            lastcheck: SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            lastcheck: Utc::now().timestamp(),
         }
     }
 }
@@ -41,6 +42,7 @@ impl PowerLock {
 }
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PowerInfo {
+    pub timestamp: i64,
     pub table: i32,
     pub cpu_family: i32,
     pub stapm_limit: f32,
@@ -54,6 +56,7 @@ pub struct PowerInfo {
 impl Default for PowerInfo {
     fn default() -> Self {
         PowerInfo {
+            timestamp: Utc::now().timestamp(),
             table: 0,
             cpu_family: 0,
             stapm_limit: 0.0,
@@ -63,6 +66,74 @@ impl Default for PowerInfo {
             fast_limit: 0.0,
             fast_value: 0.0,
         }
+    }
+}
+fn into_data_frame(data: Option<&PowerInfo>) -> DataFrame {
+    let (info, valid) = match data {
+        Some(v) => (v, true),
+        None => (&PowerInfo::default(), false),
+    };
+
+    DataFrame::new(vec![
+        Column::new(
+            PlSmallStr::from_str("timestamp"),
+            match valid {
+                true => vec![NaiveDateTime::from_timestamp(info.timestamp, 0)],
+                false => vec![] as Vec<NaiveDateTime>,
+            },
+        ),
+        Column::new(
+            PlSmallStr::from_str("stapm_limit"),
+            match valid {
+                true => vec![info.stapm_limit],
+                false => vec![] as Vec<f32>,
+            },
+        ),
+        Column::new(
+            PlSmallStr::from_str("stamp_value"),
+            match valid {
+                true => vec![info.stamp_value],
+                false => vec![] as Vec<f32>,
+            },
+        ),
+        Column::new(
+            PlSmallStr::from_str("slow_limit"),
+            match valid {
+                true => vec![info.slow_limit],
+                false => vec![] as Vec<f32>,
+            },
+        ),
+        Column::new(
+            PlSmallStr::from_str("slow_value"),
+            match valid {
+                true => vec![info.slow_value],
+                false => vec![] as Vec<f32>,
+            },
+        ),
+        Column::new(
+            PlSmallStr::from_str("fast_limit"),
+            match valid {
+                true => vec![info.fast_limit],
+                false => vec![] as Vec<f32>,
+            },
+        ),
+        Column::new(
+            PlSmallStr::from_str("fast_value"),
+            match valid {
+                true => vec![info.fast_value],
+                false => vec![] as Vec<f32>,
+            },
+        ),
+    ])
+    .unwrap()
+}
+impl dataframe::IntoDataFrame for PowerInfo {
+    fn into_data_frame(&self) -> DataFrame {
+        into_data_frame(Some(self))
+    }
+
+    fn empty_data_frame() -> DataFrame {
+        into_data_frame(None)
     }
 }
 impl PowerInfo {

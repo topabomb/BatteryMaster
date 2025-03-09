@@ -66,11 +66,11 @@
         <q-item>
           <q-item-section>
             <q-item-label class="text-white">{{
-              sys_store.cpu_vendor
+              sys_store.identifier.cpu_vendor
             }}</q-item-label>
             <q-item-label caption class="text-grey"
-              >{{ sys_store.cpu_name }}-{{
-                power_store.cpu_family
+              >{{ sys_store.identifier.cpu_name }}-{{
+                power_store.identifier.cpu_family
               }}</q-item-label
             >
           </q-item-section>
@@ -283,6 +283,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useQuasar } from "quasar";
 const $q = useQuasar();
 const power_store = usePower();
+power_store.refresh().then();
 const sys_store = useSystem();
 const loading = ref(false);
 const warn_dialog = ref(false);

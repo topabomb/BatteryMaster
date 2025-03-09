@@ -4,7 +4,7 @@
       <div class="col">
         <PercentageGauge
           name="CPU使用率"
-          :value="Number((battery_store.cpu_load * 100).toFixed(1))"
+          :value="Number((system_store.cpuload * 100).toFixed(1))"
         />
       </div>
       <div class="col">
@@ -49,10 +49,9 @@
 <script setup lang="ts">
 import { useQuasar } from "quasar";
 import { onMounted, ref } from "vue";
-import {
-  useStore as useBatteryInfoStore,
-  BatteryInfo,
-} from "../stores/BatteryInfo";
+import { useStore as useBatteryInfoStore } from "../stores/BatteryInfo";
+import { useStore as useSystemInfo } from "../stores/SystemInfo";
 import PercentageGauge from "../components/PercentageGauge.vue";
 const battery_store = useBatteryInfoStore();
+const system_store = useSystemInfo();
 </script>

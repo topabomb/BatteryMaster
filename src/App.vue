@@ -146,7 +146,7 @@ const tabChanged = async (nval: string) => {
   let result: boolean = false;
   let param = {
     battery: true,
-    system: false,
+    system: true,
     power: false,
     config: false,
     log: false,

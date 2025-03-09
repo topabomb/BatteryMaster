@@ -1,15 +1,12 @@
+use crate::dataframe;
 use battery::{
     units::{electric_potential::volt, energy::watt_hour, power::watt, ratio::ratio, time::second},
     Manager as BatteryManager, State,
 };
-
+use chrono::prelude::*;
+use polars::{frame::DataFrame, prelude::*};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{sync::Arc, time::SystemTime};
 use sys_info::loadavg;
-use tokio::{
-    sync::Mutex,
-    time::{sleep, Duration},
-};
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct SerializableState(pub State);
 impl Serialize for SerializableState {
@@ -52,10 +49,11 @@ impl<'de> Deserialize<'de> for SerializableState {
         Ok(SerializableState(state))
     }
 }
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct BatteryInfo {
+    pub state_changed: bool,
     //时间戳
-    pub timestamp: u64,
+    pub timestamp: i64,
     //状态
     pub state: SerializableState,
     //电量百分比
@@ -82,10 +80,8 @@ pub struct BatteryInfo {
 impl Default for BatteryInfo {
     fn default() -> Self {
         BatteryInfo {
-            timestamp: SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            state_changed: false,
+            timestamp: Utc::now().timestamp(),
             state: SerializableState(State::default()),
             percentage: 0.0,
             energy_rate: 0.0,
@@ -106,16 +102,75 @@ impl BatteryInfo {
         Self::default()
     }
 }
+fn into_data_frame(data: Option<&BatteryInfo>) -> DataFrame {
+    let (info, valid) = match data {
+        Some(v) => (v, true),
+        None => (&BatteryInfo::default(), false),
+    };
+
+    DataFrame::new(vec![
+        Column::new(
+            PlSmallStr::from_str("timestamp"),
+            match valid {
+                true => vec![NaiveDateTime::from_timestamp(info.timestamp, 0)],
+                false => vec![] as Vec<NaiveDateTime>,
+            },
+        ),
+        Column::new(
+            PlSmallStr::from_str("percentage"),
+            match valid {
+                true => vec![info.percentage],
+                false => vec![] as Vec<f32>,
+            },
+        ),
+        Column::new(
+            PlSmallStr::from_str("energy_rate"),
+            match valid {
+                true => vec![info.energy_rate],
+                false => vec![] as Vec<f32>,
+            },
+        ),
+        Column::new(
+            PlSmallStr::from_str("voltage"),
+            match valid {
+                true => vec![info.voltage],
+                false => vec![] as Vec<f32>,
+            },
+        ),
+        Column::new(
+            PlSmallStr::from_str("state_of_health"),
+            match valid {
+                true => vec![info.state_of_health],
+                false => vec![] as Vec<f32>,
+            },
+        ),
+        Column::new(
+            PlSmallStr::from_str("state"),
+            match valid {
+                true => vec![serde_json::to_string(&info.state).unwrap()],
+                false => vec![] as Vec<String>,
+            },
+        ),
+    ])
+    .unwrap()
+}
+
+impl dataframe::IntoDataFrame for BatteryInfo {
+    fn into_data_frame(&self) -> DataFrame {
+        into_data_frame(Some(self))
+    }
+
+    fn empty_data_frame() -> DataFrame {
+        into_data_frame(None)
+    }
+}
 #[derive(Clone)]
 pub struct Battery {
-    pub current: Result<BatteryInfo, ()>,
+    pub prev: Option<BatteryInfo>,
 }
 impl Battery {
     pub fn new() -> Battery {
-        let mut instance = Battery { current: Err(()) };
-        let mut current = instance.last();
-        instance.current = Ok(current);
-        instance
+        Battery { prev: None }
     }
     pub fn last(&mut self) -> BatteryInfo {
         let bms = BatteryManager::new().unwrap();
@@ -159,15 +214,12 @@ impl Battery {
             };
             break;
         }
-        record
-    }
-    pub fn start(instance: Arc<Mutex<Battery>>, interval_secs: u64) {
-        tokio::spawn(async move {
-            loop {
-                let mut instance = instance.lock().await;
-                instance.current = Ok(instance.last());
-                sleep(Duration::from_secs(interval_secs)).await;
+        if let Some(v) = &self.prev {
+            if v.state != record.state && v.state != SerializableState(::battery::State::Unknown) {
+                record.state_changed = true;
             }
-        });
+        }
+        self.prev = Some(record.clone());
+        record
     }
 }

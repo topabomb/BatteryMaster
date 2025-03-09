@@ -1,9 +1,4 @@
-use std::sync::Arc;
-
 use tauri::{AppHandle, Manager};
-use tokio::sync::Mutex;
-
-use crate::session;
 
 #[cfg(windows)]
 pub fn is_admin() -> bool {
@@ -91,16 +86,4 @@ pub fn active_window(app: &AppHandle, name: &str) {
         window.show().unwrap();
         window.set_focus().unwrap();
     }
-}
-pub fn active_window_change_state(app: &AppHandle, name: &str) {
-    active_window(app, name);
-    let state = app.state::<Arc<Mutex<session::SessionState>>>();
-    // 将 state 转移到异步任务中
-    tokio::spawn({
-        let state = Arc::clone(&state); // 克隆 Arc 以便传递给异步任务
-        async move {
-            let mut state = state.lock().await; // 异步地获取 Mutex 锁
-            state.is_min_tray = false; // 修改状态
-        }
-    });
 }

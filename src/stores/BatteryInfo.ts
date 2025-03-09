@@ -1,13 +1,16 @@
 import { defineStore } from "pinia";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 export interface BatteryInfo {
+  identifier: {
+    serial_number: string;
+    vendor: string;
+    model: string;
+  };
+  state_changed: boolean;
   timestamp: number;
-  serial_number: "";
   state: string;
   percentage: number;
   energy_rate: number;
-  cpu_load: number;
-  cpu_model: string;
   capacity: number;
   design_capacity: number;
   state_of_health: number;
@@ -18,13 +21,16 @@ export interface BatteryInfo {
 let listenHandle: Promise<UnlistenFn>;
 export const useStore = defineStore("BatteryInfo", {
   state: (): BatteryInfo => ({
+    identifier: {
+      serial_number: "",
+      vendor: "",
+      model: "",
+    },
+    state_changed: false,
     timestamp: 0,
-    serial_number: "",
     state: "",
     percentage: 0,
     energy_rate: 0,
-    cpu_load: 0,
-    cpu_model: "",
     capacity: 0,
     design_capacity: 0,
     state_of_health: 0,

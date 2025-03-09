@@ -12,8 +12,10 @@ export interface FormValue extends LimitSet {
   modifyed: boolean;
 }
 export interface PowerInfo extends LimitSet {
+  identifier: {
+    cpu_family: number;
+  };
   table: number;
-  cpu_family: number;
   stamp_value: number;
   fast_value: number;
   slow_value: number;
@@ -36,8 +38,9 @@ export const useStore = defineStore("ApuPower", {
       },
       init_value: undefined,
       isAdmin: false,
+      identifier: { cpu_family: 0 },
       table: 0,
-      cpu_family: 0,
+
       stapm_limit: 0,
       stamp_value: 0,
       fast_limit: 0,
@@ -49,16 +52,20 @@ export const useStore = defineStore("ApuPower", {
   getters: {},
   actions: {
     async load() {
-      listenHandle = listen<PowerInfo>("power_info_updated", async (e) => {
-        if (!this.init_value) {
-          this.init_value = {
-            fast_limit: e.payload.fast_limit,
-            slow_limit: e.payload.slow_limit,
-            stapm_limit: e.payload.stapm_limit,
-          };
+      listenHandle = listen<PowerInfo | undefined>(
+        "power_info_updated",
+        async (e) => {
+          if (!e.payload) return;
+          if (!this.init_value) {
+            this.init_value = {
+              fast_limit: e.payload.fast_limit,
+              slow_limit: e.payload.slow_limit,
+              stapm_limit: e.payload.stapm_limit,
+            };
+          }
+          await this.update(e.payload);
         }
-        await this.update(e.payload);
-      });
+      );
       this.isAdmin = (await invoke("get_isadmin")) as boolean;
     },
     async refresh() {
