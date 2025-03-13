@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{path::Display, str::FromStr};
 
 pub use battery_lib::State as ExternalBatteryState;
 use battery_lib::{
@@ -44,7 +44,11 @@ impl<'de> Deserialize<'de> for State {
         }))
     }
 }
-
+impl std::fmt::Display for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}", self.0))
+    }
+}
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 struct Identifier {
     //供应商

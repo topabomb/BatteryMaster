@@ -57,10 +57,11 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useStore as useBatteryInfo, BatteryInfo } from "./stores/BatteryInfo";
 import { useRouter } from "vue-router";
 import { useStore as useConfig, Config } from "./stores/Config";
-import { useStore as usePower, ApuPower } from "./stores/ApuPower";
+import { useStore as usePower, PowerInfo } from "./stores/ApuPower";
 import { useStore as useSystem } from "./stores/SystemInfo";
+import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import router from "./router";
-
+const $q = useQuasar();
 const config_store = useConfig();
 config_store.load().then();
 const battery_store = useBatteryInfo();
@@ -137,6 +138,11 @@ const state_icon = computed(() => {
       return "battery_unknown";
   }
 });
+listen<BatteryInfo>("battery_state_changed", (e) => {
+  if (e.payload.state_changed) {
+    $q.notify(`Battery state is changed.`);
+  }
+}).then();
 let tab = ref("");
 onMounted(() => {
   router.push("/monitor");

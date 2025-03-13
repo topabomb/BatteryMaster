@@ -19,6 +19,7 @@ pub fn run() {
     let args: Vec<String> = env::args().collect();
     let is_autostart = args.contains(&"--autostart".to_string());
     let is_adminstart = args.contains(&"--adminstart".to_string());
+    let mut persis: Option<persis::Manager> = None;
     panic::set_hook(Box::new(|info| {
         let payload = info.payload();
         let message = if let Some(s) = payload.downcast_ref::<&str>() {
@@ -42,6 +43,7 @@ pub fn run() {
         std::process::exit(1); // 可以替换为你希望的退出代码
     }));
     tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .target(tauri_plugin_log::Target::new(
@@ -51,7 +53,7 @@ pub fn run() {
                     },
                 ))
                 .max_file_size(1_000_000 /* bytes */)
-                .level(log::LevelFilter::Warn)
+                .level(log::LevelFilter::Info)
                 .timezone_strategy(tauri_plugin_log::TimezoneStrategy::UseUtc)
                 .build(),
         )
@@ -71,7 +73,7 @@ pub fn run() {
             Some(vec!["--autostart"]),
         ))
         .setup(move |app| {
-            log!(Level::Debug, "args ={:?}", args);
+            log!(Level::Info, "args ={:?}", args);
             let config = config::load_config().expect("load_config err.");
             let session = session::SessionState::new(config);
             app.manage(Arc::new(Mutex::new(session)));
@@ -106,7 +108,7 @@ pub fn run() {
                             battery.last();
                             if battery.state_changed {
                                 log!(
-                                    Level::Debug,
+                                    Level::Info,
                                     "Battery State {:?}->{:?}",
                                     last_state,
                                     battery.state
@@ -121,6 +123,37 @@ pub fn run() {
                                 log!(Level::Warn, "loop get_powerinfo err.");
                                 state.system.support_power_set = false;
                             }
+                        }
+                        //store
+                        if state.config.record_battery_history {
+                            if persis.is_none() {
+                                persis = Some(
+                                    persis::Manager::build(
+                                        &config::get_exe_directory()
+                                            .join("history.db")
+                                            .to_str()
+                                            .unwrap()
+                                            .to_string(),
+                                        15,
+                                    )
+                                    .await
+                                    .unwrap(),
+                                );
+                            }
+                        } else {
+                            if let Some(ref mut manager) = persis {
+                                manager.close().await;
+                                persis = None;
+                            }
+                        }
+                        if let Some(ref mut manager) = persis {
+                            let res = manager
+                                .insert_battery(state.battery.as_ref().unwrap(), &state.system)
+                                .await;
+                            res.map_err(|e| {
+                                log!(Level::Error, "manager.insert_battery error:{}", e);
+                            })
+                            .unwrap();
                         }
                         //power_lock
                         if state.power_lock.enable
@@ -142,7 +175,7 @@ pub fn run() {
                                                 {
                                                     info.last();
                                                 }
-                                                log!(Level::Debug, "in loop,set_limit:{:?}", info);
+                                                log!(Level::Warn, "in loop,set_limit:{:?}", info);
                                             }
                                             Err(err) => {
                                                 state.power_lock.enable = false;

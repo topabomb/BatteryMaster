@@ -40,7 +40,6 @@ export const useStore = defineStore("ApuPower", {
       isAdmin: false,
       identifier: { cpu_family: 0 },
       table: 0,
-
       stapm_limit: 0,
       stamp_value: 0,
       fast_limit: 0,

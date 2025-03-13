@@ -33,7 +33,7 @@ impl Default for Config {
             start_minimize: false,
             ui_update: 2,
             service_update: 1,
-            record_battery_history: false,
+            record_battery_history: true,
         }
     }
 }

@@ -1,0 +1,22 @@
+[package]
+name = "persis"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = "0.4.40"
+migration = { path = "./migration" }
+sea-orm = { version = "1.1.7", features = [
+    "sqlx-sqlite",
+    "runtime-tokio-native-tls",
+] }
+sea-orm-migration = "1.1.7"
+status={path = "../status"}
+battery = { path = "../battery" }
+system = { path = "../system" }
+[dev-dependencies]
+tokio = { version = "1.44", features = ["full","test-util"] }
+dotenv = { version = "0.15" }
+[workspace]
+members = ["migration"]
+[workspace.dependencies]

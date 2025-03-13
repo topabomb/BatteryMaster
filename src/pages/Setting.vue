@@ -25,7 +25,7 @@
           </q-item-section>
         </q-item>
         <q-separator spaced />
-        <!--
+
         <q-item tag="label" v-ripple>
           <q-item-section>
             <q-item-label>记录历史</q-item-label>
@@ -38,7 +38,7 @@
           </q-item-section>
         </q-item>
         <q-separator spaced />
-        -->
+
         <q-item-label header class="text-grey-3">后台更新间隔</q-item-label>
         <q-item>
           <q-item-section side>

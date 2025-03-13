@@ -1,0 +1,5 @@
+/target
+.generate-entity/src
+migration/target
+.env
+migration/database
