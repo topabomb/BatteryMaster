@@ -17,6 +17,10 @@ import "quasar/src/css/index.sass";
 // and placed in same folder as main.js
 import App from "./App.vue";
 
+import { zhCN } from "date-fns/locale";
+import { setDefaultOptions } from "date-fns";
+setDefaultOptions({ locale: zhCN });
+
 const myApp = createApp(App);
 
 myApp.use(Quasar, {

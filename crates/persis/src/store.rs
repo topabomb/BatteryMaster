@@ -7,6 +7,11 @@ use chrono::prelude::*;
 use chrono::{DateTime, Duration, Utc};
 use migration::*;
 use sea_orm::*;
+#[derive(Debug,PartialEq,Eq, Clone, Copy)]
+pub enum InsertModifyed {
+    Unknown,
+    BatteryHistory,
+}
 pub struct BatteryStore {
     pub db: Option<DatabaseConnection>,
     pub mem_db: DatabaseConnection,
@@ -47,22 +52,25 @@ impl BatteryStore {
         };
         Ok(instance)
     }
-    pub async fn insert(
+    pub async fn insert<F>(
         &mut self,
         battery: &battery::Status,
         system: &system::Status,
-    ) -> Result<Option<memory_battery_status::Model>, DbErr> {
+        f: F,
+    ) -> Result<(Vec<InsertModifyed>, Option<memory_battery_status::Model>), DbErr>
+    where
+        F: AsyncFnOnce(i64) -> (),
+    {
         let status = memory_battery_status::ActiveModel {
             timestamp: ActiveValue::Set(battery.timestamp),
             state: ActiveValue::Set(battery.state.to_string()),
             percentage: ActiveValue::Set(battery.percentage),
-            state_of_health: ActiveValue::Set(battery.state_of_health),
             energy_rate: ActiveValue::Set(battery.energy_rate),
             voltage: ActiveValue::Set(battery.voltage),
             cpu_load: ActiveValue::Set(system.cpuload),
-            screen_brightness: ActiveValue::Set(system.screen_brightness),
             ..Default::default()
         };
+        let mut changed_vec: Vec<InsertModifyed> = Vec::new();
         let model = status.insert(&self.mem_db).await;
         match model {
             Err(err) => {
@@ -74,119 +82,44 @@ impl BatteryStore {
                     //时间长了会出现这个错误，不理解为什么，故丢弃数据，重置这个数据库连接
                     self.mem_db = Database::connect(String::from("sqlite::memory:")).await?;
                     Migrator::up(&self.mem_db, None).await?;
-                    Ok(None)
+                    Ok((vec![InsertModifyed::Unknown], None))
                 } else {
                     Err(err)
                 }
             }
             Ok(model) => {
-                let now = Utc::now().timestamp();
-                self.history(&now, &battery, &system).await?;
+                let now = battery.timestamp;
+                let new_history = self.history(&now, &battery, &system).await?;
+                let mut result_history = None;
                 if (self.last_save_at + self.interval_secs as i64) < now {
                     self.last_save_at = now;
                     self.clean(&now).await?;
                     self.merge(&now).await?;
-                    self.update_history_avg(&now, None).await?;
+                    result_history = self.update_last_history(&now, battery, system).await?;
                 }
-                Ok(Some(model))
+                if result_history.is_some() || new_history.is_some() {
+                    changed_vec.push(InsertModifyed::BatteryHistory);
+                }
+                match result_history {
+                    Some(h) => f(h).await,
+                    None => match new_history {
+                        Some(h) => f(h).await,
+                        None => (),
+                    },
+                }
+                Ok((changed_vec, Some(model)))
             }
         }
     }
-    async fn update_history_avg(
-        &mut self,
-        now: &i64,
-        history: Option<battery_state_history::Model>,
-    ) -> Result<(), DbErr> {
-        let db = self.db.as_ref().unwrap();
-        let model = match history {
-            Some(v) => v,
-            None => {
-                let last = battery_state_history::Entity::find()
-                    .filter(battery_state_history::Column::Timestamp.lt(*now))
-                    .order_by_desc(battery_state_history::Column::Timestamp)
-                    .one(db)
-                    .await?;
-                if last.is_none() {
-                    return Ok(());
-                }
-                last.unwrap()
-            }
-        };
-        if model.end_at.is_none() {
-            let func_str = match model.state.as_str() {
-                "full" => "MAX",
-                "charging" => "MAX",
-                "discharging" => "MIN",
-                _ => "AVG",
-            };
-            let sql = format!(
-                r#"
-SELECT 
-    {func_str}(percentage) as percentage,
-    MIN(state_of_health) as state_of_health,
-    AVG(energy_rate) as energy_rate,
-    AVG(voltage) as voltage,
-    AVG(cpu_load) as cpu_load,
-    AVG(screen_brightness) as screen_brightness
-FROM battery_one_minutes
-WHERE timestamp BETWEEN {} AND {}
-        "#,
-                model.timestamp, now
-            );
-            let rows = db
-                .query_one(Statement::from_string(
-                    sea_orm::DatabaseBackend::Sqlite,
-                    sql,
-                ))
-                .await?;
-            let mut model = model.into_active_model();
-            if let Some(rows) = rows {
-                let res = rows.try_get_many::<(f32, f32, f32, f32, f32, f32)>(
-                    "",
-                    &[
-                        "percentage".to_string(),
-                        "state_of_health".to_string(),
-                        "energy_rate".to_string(),
-                        "voltage".to_string(),
-                        "cpu_load".to_string(),
-                        "screen_brightness".to_string(),
-                    ],
-                );
-                if res.is_ok() {
-                    res.map(
-                        |(
-                            percentage,
-                            state_of_health,
-                            energy_rate,
-                            voltage,
-                            cpu_load,
-                            screen_brightness,
-                        )| {
-                            model.percentage = Set(percentage);
-                            model.state_of_health = Set(state_of_health);
-                            model.energy_rate = Set(energy_rate);
-                            model.voltage = Set(voltage);
-                            model.cpu_load = Set(cpu_load);
-                            model.screen_brightness = Set(screen_brightness);
-                        },
-                    )?;
-                    model = model.save(db).await?;
-                    println!(
-                        "update_history_avg update for timestamp({}).",
-                        model.timestamp.unwrap()
-                    );
-                }
-            }
-        }
-        Ok(())
-    }
+
     async fn history(
         &mut self,
         now: &i64,
         battery: &battery::Status,
         system: &system::Status,
-    ) -> Result<(), DbErr> {
+    ) -> Result<Option<i64>, DbErr> {
         let db = &self.db.as_ref().unwrap().clone();
+        let mut last_insert_id = None;
         if !battery.state_changed {
             if self.history_need_init {
                 self.history_need_init = false;
@@ -207,16 +140,16 @@ WHERE timestamp BETWEEN {} AND {}
                             energy_rate: Set(battery.energy_rate),
                             voltage: Set(battery.voltage),
                             cpu_load: Set(system.cpuload),
-                            screen_brightness: Set(system.screen_brightness),
                             prev: Set(None),
                             end_at: Set(None),
                         })
                         .exec(db)
                         .await?;
                     println!("history init of last_insert_id({})", res.last_insert_id);
+                    last_insert_id = Some(res.last_insert_id)
                 }
             }
-            return Ok(());
+            return Ok(last_insert_id);
         }
         let prev = battery_state_history::Entity::find()
             .filter(battery_state_history::Column::Timestamp.lt(*now))
@@ -236,12 +169,12 @@ WHERE timestamp BETWEEN {} AND {}
             energy_rate: Set(battery.energy_rate),
             voltage: Set(battery.voltage),
             cpu_load: Set(system.cpuload),
-            screen_brightness: Set(system.screen_brightness),
         };
         if let Some(prev) = prev {
             let mut prev_model = prev.clone().into_active_model();
-            self.update_history_avg(now, Some(prev)).await?;
-            prev_model.end_at = Set(Some(*now));
+            self.update_history_avg(now, prev, battery, system, Some(*now))
+                .await?;
+            prev_model.state_of_health = Set(battery.state_of_health);
             prev_model.save(db).await?;
         }
         let old = battery_state_history::Entity::find_by_id(*now)
@@ -252,11 +185,152 @@ WHERE timestamp BETWEEN {} AND {}
                 .exec(db)
                 .await?;
             println!("history insert of last_insert_id({})", res.last_insert_id);
+            last_insert_id = Some(res.last_insert_id);
         } else {
             let res = battery_state_history::Entity::update(model)
                 .exec(db)
                 .await?;
             println!("history update of timestamp({})", res.timestamp);
+        }
+        Ok(last_insert_id)
+    }
+    async fn update_last_history(
+        &mut self,
+        now: &i64,
+        battery: &battery::Status,
+        system: &system::Status,
+    ) -> Result<Option<i64>, DbErr> {
+        let db = self.db.as_ref().unwrap();
+        let last = battery_state_history::Entity::find()
+            .filter(battery_state_history::Column::Timestamp.lt(*now))
+            .order_by_desc(battery_state_history::Column::Timestamp)
+            .one(db)
+            .await?;
+        let new_model = battery_state_history::ActiveModel {
+            timestamp: Set(*now),
+            state: Set(battery.state.to_string()),
+            capacity: Set(battery.capacity),
+            full_capacity: Set(battery.full_capacity),
+            design_capacity: Set(battery.design_capacity),
+            percentage: Set(battery.percentage),
+            state_of_health: Set(battery.state_of_health),
+            energy_rate: Set(battery.energy_rate),
+            voltage: Set(battery.voltage),
+            cpu_load: Set(system.cpuload),
+            prev: Set(None),
+            end_at: Set(None),
+        };
+        let new_id = match &last {
+            None => {
+                let res =
+                    battery_state_history::Entity::insert(battery_state_history::ActiveModel {
+                        prev: Set(None),
+                        end_at: Set(None),
+                        ..new_model
+                    })
+                    .exec(db)
+                    .await?;
+                Some(res.last_insert_id)
+            }
+            Some(last) => {
+                if last.end_at.is_none()
+                    && last.state != battery.state.to_string()
+                    && battery.state != battery::State(battery::ExternalBatteryState::Unknown)
+                {
+                    let res =
+                        battery_state_history::Entity::insert(battery_state_history::ActiveModel {
+                            prev: Set(Some(last.state.clone())),
+                            end_at: Set(None),
+                            ..new_model
+                        })
+                        .exec(db)
+                        .await?;
+
+                    Some(res.last_insert_id)
+                } else {
+                    None
+                }
+            }
+        };
+        if last.is_some() {
+            let last = last.unwrap();
+            self.update_history_avg(
+                now,
+                last,
+                battery,
+                system,
+                match new_id.is_some() {
+                    true => Some(*now),
+                    false => None,
+                },
+            )
+            .await?;
+        }
+        Ok(new_id)
+    }
+    async fn update_history_avg(
+        &mut self,
+        now: &i64,
+        history: battery_state_history::Model,
+        battery: &battery::Status,
+        system: &system::Status,
+        end: Option<i64>,
+    ) -> Result<(), DbErr> {
+        let model = history;
+        let db = self.db.as_ref().unwrap();
+        if model.end_at.is_none() {
+            let min_start_at = *now - Duration::days(7).num_seconds();
+            let timestamp = match model.timestamp < min_start_at {
+                true => min_start_at,
+                false => model.timestamp,
+            };
+            let sql = format!(
+                r#"
+SELECT 
+    AVG(energy_rate) as energy_rate,
+    AVG(voltage) as voltage,
+    AVG(cpu_load) as cpu_load
+FROM battery_one_minutes
+WHERE timestamp BETWEEN {timestamp} AND {now}
+"#
+            );
+            let rows = db
+                .query_one(Statement::from_string(
+                    sea_orm::DatabaseBackend::Sqlite,
+                    sql,
+                ))
+                .await?;
+            let mut model = model.into_active_model();
+            if let Some(rows) = rows {
+                let res = rows.try_get_many::<(f32, f32, f32)>(
+                    "",
+                    &[
+                        "energy_rate".to_string(),
+                        "voltage".to_string(),
+                        "cpu_load".to_string(),
+                    ],
+                );
+                if res.is_ok() {
+                    res.map(|(energy_rate, voltage, cpu_load)| {
+                        model.energy_rate = Set(energy_rate);
+                        model.voltage = Set(voltage);
+                        model.cpu_load = Set(cpu_load);
+                    })?;
+                }
+                model.percentage = Set(battery.percentage);
+                model.state_of_health = Set(battery.state_of_health);
+                model.capacity = Set(battery.capacity);
+                model.full_capacity = Set(battery.full_capacity);
+                model.design_capacity = Set(battery.design_capacity);
+                end.map(|end| {
+                    model.end_at = Set(Some(end));
+                });
+                model = model.save(db).await?;
+                println!(
+                    "update_history_avg update for timestamp({}).",
+                    model.timestamp.unwrap()
+                );
+            }
         }
         Ok(())
     }
@@ -273,7 +347,7 @@ WHERE timestamp BETWEEN {} AND {}
             res.rows_affected
         );
         //clean battery_realtime
-        let clean_point = now - Duration::hours(6).num_seconds();
+        let clean_point = now - Duration::days(1).num_seconds();
         let res = battery_realtime::Entity::delete_many()
             .filter(battery_realtime::Column::Timestamp.lt(clean_point))
             .exec(db)
@@ -283,7 +357,7 @@ WHERE timestamp BETWEEN {} AND {}
             res.rows_affected
         );
         //clean battery_one_minutes
-        let clean_point = now - Duration::days(30).num_seconds();
+        let clean_point = now - Duration::days(7).num_seconds();
         let res = battery_one_minutes::Entity::delete_many()
             .filter(battery_one_minutes::Column::Timestamp.lt(clean_point))
             .exec(db)
@@ -303,7 +377,7 @@ WHERE timestamp BETWEEN {} AND {}
                 table_name: "memory_battery_status".to_string(),
                 end_time: *now,
                 start_time: now - self.interval_secs as i64,
-                interval_secs: 1,
+                interval_secs: 2,
                 order_field: "id".to_string(),
                 ..Default::default()
             },
@@ -318,8 +392,6 @@ WHERE timestamp BETWEEN {} AND {}
                 energy_rate: x.energy_rate,
                 voltage: x.voltage,
                 cpu_load: x.cpu_load,
-                screen_brightness: x.screen_brightness,
-                state_of_health: x.state_of_health,
             }
             .into_active_model()
         })
@@ -357,8 +429,6 @@ WHERE timestamp BETWEEN {} AND {}
                 energy_rate: x.energy_rate,
                 voltage: x.voltage,
                 cpu_load: x.cpu_load,
-                screen_brightness: x.screen_brightness,
-                state_of_health: x.state_of_health,
             }
             .into_active_model()
         })

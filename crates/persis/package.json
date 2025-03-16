@@ -8,7 +8,7 @@
   "scripts": {
     "migrate:refresh": "sea-orm-cli migrate refresh",
     "migrate:up": "sea-orm-cli migrate up",
-    "generate":"sea-orm-cli generate entity -o src/entities",
+    "generate":"sea-orm-cli generate entity -o src/entities --with-serde both",
     "prev_test":"npm run migrate:up&&npm run generate",
     "test":"cargo test -- --nocapture"
   },

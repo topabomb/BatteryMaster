@@ -3,6 +3,8 @@ use std::sync::Arc;
 use crate::config;
 use crate::session;
 use crate::windows;
+use chrono::Duration;
+use chrono::Utc;
 use log::{log, Level};
 use status::{Last, Status};
 use system::*;
@@ -93,7 +95,7 @@ pub async fn set_power_limit(
         Err(_) => (false, None),
     };
     if result.0 {
-        session::EventChannel::emit_ui_update(&app_handle, &state).await;
+        session::EventChannel::emit_ui_update(&app_handle, &state);
     }
     Ok(result)
 }
@@ -131,4 +133,32 @@ pub async fn set_event_channel(
     let mut state = state.lock().await;
     state.channel = setting;
     Ok(true)
+}
+#[command]
+pub async fn get_battery(
+    app_handle: tauri::AppHandle,
+    state: State<'_, Arc<Mutex<session::SessionState>>>,
+) -> Result<Option<battery::Status>, ()> {
+    let state = state.lock().await;
+    Ok(state.battery.clone())
+}
+#[command]
+pub async fn get_battery_history_page(
+    app_handle: tauri::AppHandle,
+    state: State<'_, Arc<Mutex<session::SessionState>>>,
+    cursor: Option<i64>,
+    size: u8,
+) -> Result<Option<Vec<persis::HistoryInfo>>, ()> {
+    let now = Utc::now().timestamp();
+    let state = state.lock().await;
+    match &state.persis {
+        Some(persis) => {
+            let rows = persis
+                .select_history_page(cursor, size, 0, now)
+                .await
+                .unwrap();
+            Ok(Some(rows))
+        }
+        None => Ok(None),
+    }
 }

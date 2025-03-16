@@ -13,9 +13,9 @@
           indicator-color="transparent"
         >
           <q-route-tab name="monitor" label="监控" to="/monitor" exact />
-          <!--
-          <q-route-tab name="history" label="历史" to="/history" exact />
-          -->
+
+          <q-route-tab name="history" label="健康度" to="/history" exact />
+
           <q-route-tab name="cpupower" label="功耗" to="/cpupower" exact />
           <q-route-tab name="setting" label="设置" to="/setting" exact />
         </q-tabs>
@@ -38,12 +38,23 @@
 
         <q-separator vertical></q-separator>
         <q-btn dense flat icon="minimize" @click="minimize" />
+        <q-btn
+          dense
+          flat
+          :icon="isMaximized ? `crop_5_4` : `crop_square`"
+          @click="maximize"
+        />
         <q-btn dense flat icon="close" @click="close" />
       </q-bar>
     </q-header>
 
     <q-page-container>
-      <router-view class="bg-dark" />
+      <q-scroll-area
+        style="height: calc(100vh - 32px)"
+        class="q-ma-none q-pa-none bg-dark"
+      >
+        <router-view />
+      </q-scroll-area>
     </q-page-container>
   </q-layout>
 </template>
@@ -55,10 +66,10 @@ import { formatDuration, intervalToDuration } from "date-fns";
 import { onMounted, computed, ref } from "vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useStore as useBatteryInfo, BatteryInfo } from "./stores/BatteryInfo";
-import { useRouter } from "vue-router";
 import { useStore as useConfig, Config } from "./stores/Config";
 import { useStore as usePower, PowerInfo } from "./stores/ApuPower";
 import { useStore as useSystem } from "./stores/SystemInfo";
+import { useStore as useHistory } from "./stores/HistoryInfo";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import router from "./router";
 const $q = useQuasar();
@@ -70,6 +81,8 @@ const power_store = usePower();
 power_store.load().then();
 const sys_store = useSystem();
 sys_store.load().then();
+const history_store = useHistory();
+history_store.load().then();
 const state_color = computed(() => {
   switch (battery_store.state) {
     case "Full":
@@ -148,6 +161,7 @@ onMounted(() => {
   router.push("/monitor");
 });
 const tabChanged = async (nval: string) => {
+  console.log(nval);
   if (!nval) return;
   let result: boolean = false;
   let param = {
@@ -190,5 +204,15 @@ const minimize = () => {
 };
 const close = () => {
   getCurrentWindow().close();
+};
+const isMaximized = ref(false);
+const maximize = async () => {
+  if (await getCurrentWindow().isMaximized()) {
+    await getCurrentWindow().unmaximize();
+    isMaximized.value = false;
+  } else {
+    await getCurrentWindow().maximize();
+    isMaximized.value = true;
+  }
 };
 </script>

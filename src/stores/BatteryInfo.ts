@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 export interface BatteryInfo {
   identifier: {
     serial_number: string;
@@ -12,6 +13,7 @@ export interface BatteryInfo {
   percentage: number;
   energy_rate: number;
   capacity: number;
+  full_capacity: number;
   design_capacity: number;
   state_of_health: number;
   voltage: number;
@@ -32,6 +34,7 @@ export const useStore = defineStore("BatteryInfo", {
     percentage: 0,
     energy_rate: 0,
     capacity: 0,
+    full_capacity: 0,
     design_capacity: 0,
     state_of_health: 0,
     voltage: 0,
@@ -41,6 +44,8 @@ export const useStore = defineStore("BatteryInfo", {
   getters: {},
   actions: {
     async load() {
+      const val = (await invoke("get_battery")) as BatteryInfo;
+      this.$patch(val);
       listenHandle = listen<BatteryInfo>("battery_info_updated", async (e) => {
         await this.update(e.payload);
       });

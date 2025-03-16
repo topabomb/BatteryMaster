@@ -40,11 +40,9 @@ WITH GroupData AS (
 SELECT
 strftime('{formater}', {time_field}/{interval_secs}*{interval_secs} , 'unixepoch') AS time_group,
 AVG(percentage) AS percentage,
-MIN(state_of_health) as state_of_health,
 AVG(energy_rate) AS energy_rate,
 AVG(voltage) AS voltage,
 AVG(cpu_load) AS cpu_load,
-AVG(screen_brightness) AS screen_brightness,
 MAX({time_field}) AS last_timestamp
 FROM
 {table_name}
@@ -64,11 +62,9 @@ WHERE {time_field}>{start_time} and {time_field}<={end_time}
 SELECT
 g.time_group,
 g.percentage,
-g.state_of_health,
 g.energy_rate,
 g.voltage,
 g.cpu_load,
-g.screen_brightness,
 b.state
 FROM
 GroupData g
@@ -94,17 +90,15 @@ pub async fn down_sample(
     let res: Vec<battery_realtime::Model> = res
         .iter()
         .map(|row| {
-            row.try_get_many::<(String, String, f32, f32, f32, f32, f32, f32)>(
+            row.try_get_many::<(String, String, f32, f32, f32, f32)>(
                 "",
                 &[
                     "time_group".to_string(),
                     "state".to_string(),
                     "percentage".to_string(),
-                    "state_of_health".to_string(),
                     "energy_rate".to_string(),
                     "voltage".to_string(),
                     "cpu_load".to_string(),
-                    "screen_brightness".to_string(),
                 ],
             )
             .unwrap()
@@ -114,11 +108,9 @@ pub async fn down_sample(
                 time_group,
                 state,
                 percentage,
-                state_of_health,
                 energy_rate,
                 voltage,
                 cpu_load,
-                screen_brightness,
             )| {
                 battery_realtime::Model {
                     timestamp: DateTime::<Utc>::from_str(time_group.as_str())
@@ -126,11 +118,9 @@ pub async fn down_sample(
                         .timestamp(),
                     state,
                     percentage,
-                    state_of_health,
                     energy_rate,
                     voltage,
                     cpu_load,
-                    screen_brightness,
                 }
             },
         )

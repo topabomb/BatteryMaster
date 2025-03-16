@@ -20,14 +20,19 @@ impl EventChannel {
         EventChannel::default()
     }
 
-    pub async fn emit_service_update(handler: &AppHandle, current: &SessionState) {
+    pub fn emit_service_update(handler: &AppHandle, current: &SessionState) {
         if let Some(v) = &current.battery {
             if v.state_changed {
                 handler.emit("battery_state_changed", v).unwrap();
             }
         }
     }
-    pub async fn emit_ui_update(handler: &AppHandle, current: &SessionState) {
+    pub fn emit_history_update(handler: &AppHandle, current: &SessionState) {
+        if current.channel.history {
+            handler.emit("history_info_updated", true).unwrap();
+        }
+    }
+    pub fn emit_ui_update(handler: &AppHandle, current: &SessionState) {
         if current.is_min_tray {
             return;
         }
@@ -76,6 +81,7 @@ pub struct SessionState {
     pub power: Option<power::Status>,
     pub power_lock: PowerLock,
     pub channel: EventChannel,
+    pub persis: Option<persis::Manager>,
 }
 impl SessionState {
     pub fn new(config: config::Config) -> Self {
@@ -111,6 +117,7 @@ impl SessionState {
                 false => None,
             },
             system,
+            persis: None,
         }
     }
 }

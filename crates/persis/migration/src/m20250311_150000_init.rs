@@ -15,11 +15,9 @@ impl MigrationTrait for Migration {
                     .col(big_integer(MemoryBatteryStatus::Timestamp))
                     .col(string(MemoryBatteryStatus::State))
                     .col(float(MemoryBatteryStatus::Percentage))
-                    .col(float(MemoryBatteryStatus::StateOfHealth))
                     .col(float(MemoryBatteryStatus::EnergyRate))
                     .col(float(MemoryBatteryStatus::Voltage))
                     .col(float(MemoryBatteryStatus::CpuLoad))
-                    .col(float(MemoryBatteryStatus::ScreenBrightness))
                     .to_owned(),
             )
             .await?;
@@ -58,7 +56,6 @@ impl MigrationTrait for Migration {
                     .col(float(BatteryStateHistory::EnergyRate))
                     .col(float(BatteryStateHistory::Voltage))
                     .col(float(BatteryStateHistory::CpuLoad))
-                    .col(float(BatteryStateHistory::ScreenBrightness))
                     .to_owned(),
             )
             .await?;
@@ -88,11 +85,9 @@ impl MigrationTrait for Migration {
                     .col(big_integer(BatteryRealtime::Timestamp).primary_key())
                     .col(string(BatteryRealtime::State))
                     .col(float(BatteryRealtime::Percentage))
-                    .col(float(BatteryRealtime::StateOfHealth))
                     .col(float(BatteryRealtime::EnergyRate))
                     .col(float(BatteryRealtime::Voltage))
                     .col(float(BatteryRealtime::CpuLoad))
-                    .col(float(BatteryRealtime::ScreenBrightness))
                     .to_owned(),
             )
             .await?;
@@ -104,11 +99,9 @@ impl MigrationTrait for Migration {
                     .col(big_integer(BatteryOneMinutes::Timestamp).primary_key())
                     .col(string(BatteryOneMinutes::State))
                     .col(float(BatteryOneMinutes::Percentage))
-                    .col(float(BatteryOneMinutes::StateOfHealth))
                     .col(float(BatteryOneMinutes::EnergyRate))
                     .col(float(BatteryOneMinutes::Voltage))
                     .col(float(BatteryOneMinutes::CpuLoad))
-                    .col(float(BatteryOneMinutes::ScreenBrightness))
                     .to_owned(),
             )
             .await?;
@@ -171,11 +164,9 @@ enum MemoryBatteryStatus {
     Timestamp,
     State,
     Percentage,
-    StateOfHealth,
     EnergyRate,
     Voltage,
     CpuLoad,
-    ScreenBrightness,
 }
 #[derive(DeriveIden)]
 enum BatteryStateHistory {
@@ -192,7 +183,6 @@ enum BatteryStateHistory {
     EnergyRate,
     Voltage,
     CpuLoad,
-    ScreenBrightness,
 }
 #[derive(DeriveIden)]
 enum BatteryRealtime {
@@ -200,11 +190,9 @@ enum BatteryRealtime {
     Timestamp,
     State,
     Percentage,
-    StateOfHealth,
     EnergyRate,
     Voltage,
     CpuLoad,
-    ScreenBrightness,
 }
 #[derive(DeriveIden)]
 enum BatteryOneMinutes {
@@ -212,9 +200,7 @@ enum BatteryOneMinutes {
     Timestamp,
     State,
     Percentage,
-    StateOfHealth,
     EnergyRate,
     Voltage,
     CpuLoad,
-    ScreenBrightness,
 }

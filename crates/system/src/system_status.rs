@@ -2,7 +2,7 @@ use chrono::prelude::*;
 use raw_cpuid::CpuId;
 use serde::{Deserialize, Serialize};
 use status::{Last, Status as BaseStatus};
-use wmi::{COMLibrary, WMIConnection};
+//use wmi::{COMLibrary, WMIConnection};
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 struct Identifier {
     pub cpu_vendor: String,
@@ -34,9 +34,9 @@ pub struct Status {
     //空闲内存
     pub memfree: u32,
     //屏幕亮度
-    pub screen_brightness: f32,
+    //pub screen_brightness: f32,
     //屏幕标识
-    pub screen_instance: String,
+    //pub screen_instance: String,
 }
 
 impl Default for Status {
@@ -47,8 +47,8 @@ impl Default for Status {
             timestamp: Default::default(),
             cpuload: Default::default(),
             memfree: Default::default(),
-            screen_brightness: Default::default(),
-            screen_instance: String::from("Unknown"),
+            //screen_brightness: Default::default(),
+            //screen_instance: String::from("Unknown"),
         }
     }
 }
@@ -59,6 +59,7 @@ struct WmiMonitorBrightness {
     InstanceName: String,
 }
 impl Status {
+    /*
     fn refresh_brightness(&mut self) {
         let com_con = COMLibrary::new();
         let com_con = match com_con {
@@ -86,6 +87,7 @@ impl Status {
             self.screen_instance = curr.InstanceName.clone();
         }
     }
+    */
     fn refresh(&mut self) {
         self.timestamp = Utc::now().timestamp();
         self.cpuload = match sys_info::loadavg() {
@@ -96,7 +98,7 @@ impl Status {
             Ok(v) => self.memfree = v.free as u32,
             Err(_) => (),
         };
-        self.refresh_brightness();
+        //self.refresh_brightness();
     }
 }
 

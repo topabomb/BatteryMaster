@@ -19,7 +19,6 @@ pub fn run() {
     let args: Vec<String> = env::args().collect();
     let is_autostart = args.contains(&"--autostart".to_string());
     let is_adminstart = args.contains(&"--adminstart".to_string());
-    let mut persis: Option<persis::Manager> = None;
     panic::set_hook(Box::new(|info| {
         let payload = info.payload();
         let message = if let Some(s) = payload.downcast_ref::<&str>() {
@@ -53,7 +52,7 @@ pub fn run() {
                     },
                 ))
                 .max_file_size(1_000_000 /* bytes */)
-                .level(log::LevelFilter::Info)
+                .level(log::LevelFilter::Warn)
                 .timezone_strategy(tauri_plugin_log::TimezoneStrategy::UseUtc)
                 .build(),
         )
@@ -104,11 +103,11 @@ pub fn run() {
                         //battery
                         if state.battery.is_some() {
                             let battery = state.battery.as_mut().unwrap();
-                            let last_state = battery.state;
+                            let last_state = battery.state.clone();
                             battery.last();
                             if battery.state_changed {
                                 log!(
-                                    Level::Info,
+                                    Level::Warn,
                                     "Battery State {:?}->{:?}",
                                     last_state,
                                     battery.state
@@ -125,35 +124,61 @@ pub fn run() {
                             }
                         }
                         //store
-                        if state.config.record_battery_history {
-                            if persis.is_none() {
-                                persis = Some(
+                        if state.config.record_battery_history && state.battery.is_some() {
+                            if state.persis.is_none() {
+                                state.persis = Some(
                                     persis::Manager::build(
                                         &config::get_exe_directory()
                                             .join("history.db")
                                             .to_str()
                                             .unwrap()
                                             .to_string(),
-                                        15,
+                                        10,
                                     )
                                     .await
                                     .unwrap(),
                                 );
                             }
                         } else {
-                            if let Some(ref mut manager) = persis {
+                            if let Some(ref mut manager) = state.persis {
                                 manager.close().await;
-                                persis = None;
+                                state.persis = None;
                             }
                         }
-                        if let Some(ref mut manager) = persis {
+                        let battery = state.battery.clone().unwrap();
+                        let system = state.system.clone();
+                        if let Some(manager) = &mut state.persis {
+                            if battery.state_changed {
+                                log!(
+                                    Level::Warn,
+                                    "process persis at({}),Battery State changed to {:?}",
+                                    battery.timestamp,
+                                    battery.state
+                                );
+                            }
                             let res = manager
-                                .insert_battery(state.battery.as_ref().unwrap(), &state.system)
+                                .insert_battery(&battery, &system, |_| async {
+                                    log!(Level::Warn, "new battery history ");
+                                    /*绝对不能在lock中再次lock，会导致死锁
+                                    let state =
+                                        handler1.state::<Arc<Mutex<session::SessionState>>>();
+                                    let state = state.lock().await;
+                                    session::EventChannel::emit_history_update(&handler1, &state);
+                                    */
+                                })
                                 .await;
-                            res.map_err(|e| {
-                                log!(Level::Error, "manager.insert_battery error:{}", e);
-                            })
-                            .unwrap();
+                            match res {
+                                Ok(res) => {
+                                    if res.contains(&persis::InsertModifyed::BatteryHistory) {
+                                        session::EventChannel::emit_history_update(
+                                            &handler1, &state,
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    log!(Level::Error, "manager.insert_battery error:{}", e);
+                                }
+                            }
                         }
                         //power_lock
                         if state.power_lock.enable
@@ -195,7 +220,7 @@ pub fn run() {
                         }
                         //store
                         //processor.update(&state);
-                        session::EventChannel::emit_service_update(&handler1, &state).await;
+                        session::EventChannel::emit_service_update(&handler1, &state);
                         secs = state.config.service_update;
                     }
 
@@ -220,7 +245,7 @@ pub fn run() {
                         let state = state.lock().await;
                         secs = state.config.ui_update;
 
-                        session::EventChannel::emit_ui_update(&handler2, &state).await;
+                        session::EventChannel::emit_ui_update(&handler2, &state);
                     }
                     sleep(Duration::from_secs(secs as u64)).await;
                 }
@@ -238,6 +263,8 @@ pub fn run() {
             commands::set_power_limit_lock,
             commands::get_system,
             commands::set_event_channel,
+            commands::get_battery,
+            commands::get_battery_history_page,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

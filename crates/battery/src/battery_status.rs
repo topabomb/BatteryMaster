@@ -147,11 +147,12 @@ impl Status {
         }
         if let Ok(battery) = o.unwrap() {
             let status = self;
-            status.timestamp = Utc::now().timestamp();
-            let n_state = State(battery.state());
+
+            let new_state = State(battery.state());
             status.state_changed =
-                status.state.0 != ExternalBatteryState::Unknown && status.state != n_state;
-            status.state = n_state;
+                status.state.0 != ExternalBatteryState::Unknown && status.state != new_state;
+            status.state = new_state;
+            status.timestamp = Utc::now().timestamp();
             status.percentage = battery.state_of_charge().get::<ratio>();
             status.voltage = battery.voltage().get::<volt>();
             status.state_of_health = battery.state_of_health().get::<ratio>();

@@ -1,10 +1,14 @@
 # BatteryMaster
 
-The Battery Master is a small tool developed using Rust. It allows you to monitor the charging and discharging power of your battery in real-time from the taskbar. You can also view various critical battery information in real-time. More features are currently under development, so stay tuned!
+Battery Master is a small tool developed using Rust. It can monitor the usage of a laptop battery, including its health, wear rate, design capacity, and more, allowing you to track the battery's charge and discharge levels in real-time from the taskbar. You can also view various critical system and battery information in real-time. More features are currently under development, so stay tuned!
 
 [Download](https://github.com/topabomb/BatteryMonitor/releases/)
 
 # History
+
+## 0.1.3
+
+Add a historical record function for laptop battery usage to track changes in battery health, charge/discharge status, charge/discharge power, and battery wear; while also updating the monitoring page.
 
 ## 0.1.2
 
@@ -28,13 +32,17 @@ I spent a long time searching for battery information monitoring software availa
 
 ![screenshot](/screenshot/tray.png "Windows tray")
 
+### History
+
+![screenshot](/screenshot/history.png "Battery history")
+
 ### Monitor
 
-![screenshot](/screenshot/monitor.png "Monitor")
+![screenshot](/screenshot/monitor.png "Battery Monitor")
 
-### Power limit
+### CPU Power limit
 
-![screenshot](/screenshot/power.png "Power limit")
+![screenshot](/screenshot/power.png "CPU Power limit")
 
 ### Settings
 

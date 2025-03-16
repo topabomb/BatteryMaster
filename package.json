@@ -11,6 +11,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@date-fns/utc": "^2.1.0",
     "@quasar/extras": "^1.16.16",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-autostart": "^2.2.0",

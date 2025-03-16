@@ -11,8 +11,6 @@ export interface SystemInfo {
   };
   cpuload: number;
   memfree: number;
-  screen_brightness: number;
-  screen_instance: string;
   support_power_set: boolean;
 }
 let listenHandle: Promise<UnlistenFn>;
@@ -28,8 +26,6 @@ export const useStore = defineStore("SystemInfo", {
       support_power_set: false,
       cpuload: 0,
       memfree: 0,
-      screen_brightness: 0,
-      screen_instance: "Unknown",
     };
   },
   getters: {},
