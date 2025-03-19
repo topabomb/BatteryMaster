@@ -157,9 +157,10 @@ impl Status {
             status.voltage = battery.voltage().get::<volt>();
             status.state_of_health = battery.state_of_health().get::<ratio>();
             status.energy_rate = match status.state {
-                State(ExternalBatteryState::Charging) => battery.energy_rate().get::<watt>(),
+                State(ExternalBatteryState::Empty) => -battery.energy_rate().get::<watt>(),
                 State(ExternalBatteryState::Discharging) => -battery.energy_rate().get::<watt>(),
-                _ => 0.0,
+                State(ExternalBatteryState::Unknown) => 0.0,
+                _ => battery.energy_rate().get::<watt>(),
             };
             status.design_capacity = battery.energy_full_design().get::<watt_hour>();
             status.full_capacity = battery.energy_full().get::<watt_hour>();
