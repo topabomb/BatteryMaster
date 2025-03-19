@@ -91,6 +91,8 @@ const state_color = computed(() => {
       return "green";
     case "Discharging":
       return "orange";
+    case "Empty":
+      return "warning";
     default:
       return "amber";
   }
@@ -114,6 +116,14 @@ const time_of_battery = computed(() => {
           end: battery_store.time_to_empty_secs * 1000,
         }),
         { format: ["hours", "minutes"] }
+      );
+    case "Empty":
+      return formatDuration(
+        intervalToDuration({
+          start: 0,
+          end: battery_store.time_to_empty_secs * 1000,
+        }),
+        { format: ["minutes", "seconds"] }
       );
     default:
       return "unknow";
@@ -147,6 +157,8 @@ const state_icon = computed(() => {
               : battery_store.percentage >= 0.3
                 ? "battery_2_bar"
                 : "battery_1_bar";
+    case "Empty":
+      return "battery_alert";
     default:
       return "battery_unknown";
   }

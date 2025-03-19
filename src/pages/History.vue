@@ -51,7 +51,13 @@
                               : ["minutes", "seconds"],
                         }
                       )
-                    : ""
+                    : formatDuration(
+                        intervalToDuration({
+                          start: row.timestamp * 1000,
+                          end: Date.now(),
+                        }),
+                        { format: ["hours", "minutes"] }
+                      )
                 }}</q-item-label
               >
               <q-item-label class="text-h6"
@@ -142,16 +148,20 @@ const state_text = (state: string) => {
   if (state == "full") return "满电";
   else if (state == "charging") return "充电";
   else if (state == "discharging") return "放电";
+  else if (state == "empty") return "告急";
 };
 const state_color = (state: string) => {
   if (state == "full") return "text-grey";
   else if (state == "charging") return "text-green";
-  else if (state == "discharging") return "text-red";
+  else if (state == "discharging") return "text-warning";
+  else if (state == "empty") return "text-red";
 };
 const state_icon = (state: string) => {
   if (state == "full") return "battery_full";
   else if (state == "charging") return "battery_saver";
   else if (state == "discharging") return "battery_charging_full";
+  else if (state == "empty") return "battery_alert";
+  else return "battery_unknown";
 };
 
 const cursor = ref(Math.round(Date.now() / 1000));
