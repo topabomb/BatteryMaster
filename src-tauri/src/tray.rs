@@ -89,7 +89,8 @@ pub async fn update_tray_icon(tray: &TrayIcon) {
     if let Some(battery) = &state.battery {
         match battery.state {
             battery::State(battery::ExternalBatteryState::Charging)
-            | battery::State(battery::ExternalBatteryState::Discharging) => {
+            | battery::State(battery::ExternalBatteryState::Discharging)
+            | battery::State(battery::ExternalBatteryState::Empty) => {
                 tray_number = (battery.energy_rate * 100.0).round() / 100.0;
             }
             _ => (),
@@ -97,6 +98,7 @@ pub async fn update_tray_icon(tray: &TrayIcon) {
         match battery.state {
             battery::State(battery::ExternalBatteryState::Charging) => color = Rgb([0, 255, 0]),
             battery::State(battery::ExternalBatteryState::Discharging) => color = Rgb([255, 0, 0]),
+            battery::State(battery::ExternalBatteryState::Empty) => color = Rgb([255, 0, 255]),
             _ => (),
         };
         tooltip = match battery.state {
@@ -105,9 +107,15 @@ pub async fn update_tray_icon(tray: &TrayIcon) {
                 format_duration(Duration::new(battery.time_to_full_secs, 0))
             ),
             battery::State(battery::ExternalBatteryState::Discharging) => format!(
-                "Discharging, estimated charging time {}",
+                "Discharging, estimated discharging time {}",
                 format_duration(Duration::new(battery.time_to_empty_secs, 0))
             ),
+            battery::State(battery::ExternalBatteryState::Empty) => {
+                format!(
+                    "Empty, percentage {}%",
+                    battery.percentage / 100.0 * 100.0 * 100.0
+                )
+            }
             battery::State(battery::ExternalBatteryState::Full) => {
                 format!("Full, Cpu load {}%", tray_number)
             }

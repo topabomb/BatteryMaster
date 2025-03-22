@@ -4,6 +4,7 @@
       <q-tab name="full" label="满电" />
       <q-tab name="discharging" label="放电中" />
       <q-tab name="charging" label="充电中" />
+      <q-tab name="empty" label="告急" />
     </q-tabs>
     <div class="row">
       <div class="col">
@@ -110,6 +111,7 @@
           </div>
         </div>
       </q-tab-panel>
+      <q-tab-panel name="empty"> </q-tab-panel>
     </q-tab-panels>
   </q-page>
 </template>

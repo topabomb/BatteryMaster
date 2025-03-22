@@ -162,3 +162,18 @@ pub async fn get_battery_history_page(
         None => Ok(None),
     }
 }
+#[command]
+pub async fn get_battery_history(
+    app_handle: tauri::AppHandle,
+    state: State<'_, Arc<Mutex<session::SessionState>>>,
+    id: i64,
+) -> Result<Option<persis::HistoryInfo>, ()> {
+    let state = state.lock().await;
+    match &state.persis {
+        Some(persis) => {
+            let row = persis.get_history(id).await.unwrap();
+            Ok(row)
+        }
+        None => Ok(None),
+    }
+}

@@ -4,6 +4,16 @@ Battery Master is a small tool developed using Rust. It can monitor the usage of
 
 [Download](https://github.com/topabomb/BatteryMonitor/releases/)
 
+## dependencies
+
+Tauri relies on the VC runtime library and WebView runtime. The latest version of Windows 11 should already have these built-in. If not, please install them manually.
+
+- Microsoft Visual C++ 2015 - 2022 Redistributable
+  x86: (https://aka.ms/vs/17/release/vc_redist.x86.exe)
+  x64: (https://aka.ms/vs/17/release/vc_redist.x64.exe)
+- Microsoft Edge WebView2
+  (https://developer.microsoft.com/zh-cn/microsoft-edge/webview2#download)
+
 # History
 
 ## 0.1.3

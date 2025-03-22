@@ -42,5 +42,8 @@ export const useStore = defineStore("HistoryInfo", {
       });
       return res;
     },
+    history: async (id: number) => {
+      return await invoke<HistoryInfo>("get_battery_history", { id });
+    },
   },
 });

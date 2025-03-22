@@ -138,7 +138,7 @@ import { useStore as useConfig, Config } from "../stores/Config";
 import { useStore as usePower, PowerInfo } from "../stores/ApuPower";
 import { useStore as useSystem } from "../stores/SystemInfo";
 import { useStore as useHistory, HistoryInfo } from "../stores/HistoryInfo";
-import { ref } from "vue";
+import { onUnmounted, ref } from "vue";
 import { listen } from "@tauri-apps/api/event";
 const $q = useQuasar();
 const config_store = useConfig();
@@ -169,25 +169,40 @@ const list = ref([] as HistoryInfo[]);
 const infiniteScroll = ref(null);
 listen<boolean>("history_info_updated", async (e) => {
   if (e) {
+    await updateLastHistory();
     const new_rows = await history_sotre.history_page(
       Math.round(Date.now() / 1000) + 1,
       1
     );
-    console.log(new_rows);
     if (new_rows && new_rows.length > 0) list.value.unshift(...new_rows);
   }
 }).then();
+const updateLastHistory = async () => {
+  if (!list.value || list.value.length === 0) return;
+  let last_row = list.value[0];
+  let last_id = last_row.timestamp;
+  const new_row = await history_sotre.history(last_id);
+  if (list.value[0].timestamp === last_id) {
+    list.value[0] = { ...new_row };
+  } else
+    list.value.forEach((row, idx) => {
+      if (row.timestamp === last_id) list.value[idx] = { ...new_row };
+    });
+  timeoutHandle = setTimeout(updateLastHistory, 60 * 1000);
+};
+let timeoutHandle = setTimeout(updateLastHistory, 60 * 1000);
+onUnmounted(() => {
+  clearTimeout(timeoutHandle);
+});
 const onLoadMore = (_: number, done?: (stop?: boolean) => void) => {
   history_sotre
     .history_page(cursor.value, 5)
     .then((rows) => {
-      console.log(rows);
       let over = false;
       if (rows && rows.length > 0) {
         list.value = list.value.concat(rows);
         const last = rows[rows.length - 1].timestamp;
         last != cursor.value && (cursor.value = last);
-        console.log(cursor.value);
       } else over = true;
       done && done(over);
     })

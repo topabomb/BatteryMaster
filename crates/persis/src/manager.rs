@@ -1,7 +1,7 @@
 use std::{fs::create_dir, path::Path};
 
 use crate::{entities::*, store};
-use sea_orm::{DbErr, FromQueryResult, Statement};
+use sea_orm::{DbErr, EntityTrait, FromQueryResult, Statement};
 use serde::*;
 
 use crate::{battery_realtime, store::BatteryStore};
@@ -69,6 +69,42 @@ impl Manager {
         if let Some(db) = &self.store.db {
             db.close_by_ref().await.unwrap();
         }
+    }
+    pub async fn get_history(&self, id: i64) -> Result<Option<HistoryInfo>, DbErr> {
+        let db = self.store.db.as_ref().unwrap();
+        let row = HistoryInfo::find_by_statement(Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            r#"
+SELECT 
+    LAG("timestamp") OVER (
+	ORDER BY "timestamp") AS prev_timestamp,
+    "timestamp" - LAG("prev_timestamp") OVER (
+	ORDER BY "timestamp") AS timestamp_diff,
+	LAG("state_of_health") OVER (
+	ORDER BY "timestamp") AS prev_state_of_health,
+	"state_of_health" - LAG("state_of_health") OVER (
+	ORDER BY "timestamp") AS state_of_health_diff,
+	LAG("capacity") OVER (
+	ORDER BY "timestamp") AS prev_capacity,
+	"capacity" - LAG("capacity") OVER (
+	ORDER BY "timestamp") AS capacity_diff,
+	LAG("percentage") OVER (
+	ORDER BY "timestamp") AS prev_percentage,
+	"percentage" - LAG("percentage") OVER (
+	ORDER BY "timestamp") AS percentage_diff,
+	*
+FROM
+	"battery_state_history"
+	WHERE "timestamp"<=$1
+ORDER BY
+	"timestamp" DESC
+LIMIT 1
+            "#,
+            [id.into()],
+        ))
+        .one(db)
+        .await;
+        row
     }
     pub async fn select_history_page(
         &self,

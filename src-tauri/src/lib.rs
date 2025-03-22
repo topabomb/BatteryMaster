@@ -265,6 +265,7 @@ pub fn run() {
             commands::set_event_channel,
             commands::get_battery,
             commands::get_battery_history_page,
+            commands::get_battery_history,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

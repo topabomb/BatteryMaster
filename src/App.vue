@@ -118,13 +118,7 @@ const time_of_battery = computed(() => {
         { format: ["hours", "minutes"] }
       );
     case "Empty":
-      return formatDuration(
-        intervalToDuration({
-          start: 0,
-          end: battery_store.time_to_empty_secs * 1000,
-        }),
-        { format: ["minutes", "seconds"] }
-      );
+      return "nan";
     default:
       return "unknow";
   }
