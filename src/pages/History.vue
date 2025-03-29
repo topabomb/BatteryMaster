@@ -74,7 +74,7 @@
             <q-item-section
               ><q-item-label caption
                 >开始于
-                {{ format(row.timestamp * 1000, "MM-dd hh:mm") }}</q-item-label
+                {{ format(row.timestamp * 1000, "MM-dd HH:mm") }}</q-item-label
               ><q-item-label class="text-h6"
                 ><span :class="state_color(row.state)">
                   {{

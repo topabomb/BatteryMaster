@@ -7,7 +7,7 @@ use chrono::prelude::*;
 use chrono::{DateTime, Duration, Utc};
 use migration::*;
 use sea_orm::*;
-#[derive(Debug,PartialEq,Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum InsertModifyed {
     Unknown,
     BatteryHistory,
@@ -71,22 +71,23 @@ impl BatteryStore {
             ..Default::default()
         };
         let mut changed_vec: Vec<InsertModifyed> = Vec::new();
-        let model = status.insert(&self.mem_db).await;
-        match model {
-            Err(err) => {
-                println!("insert to memory_battery_status error:%{}", err);
-                if err
-                    .to_string()
-                    .contains("no such table: memory_battery_status")
-                {
-                    //时间长了会出现这个错误，不理解为什么，故丢弃数据，重置这个数据库连接
-                    self.mem_db = Database::connect(String::from("sqlite::memory:")).await?;
-                    Migrator::up(&self.mem_db, None).await?;
-                    Ok((vec![InsertModifyed::Unknown], None))
-                } else {
-                    Err(err)
-                }
+        let mut model = status.clone().insert(&self.mem_db).await;
+        if model.is_err() {
+            let err = model.err().unwrap();
+            println!("insert to memory_battery_status error:%{}", err);
+            if err
+                .to_string()
+                .contains("no such table: memory_battery_status")
+            {
+                //时间长了会出现这个错误，不理解为什么，故丢弃数据，重置这个数据库连接
+                self.mem_db = Database::connect(String::from("sqlite::memory:")).await?;
+                Migrator::up(&self.mem_db, None).await?;
+                model = status.insert(&self.mem_db).await;
+            } else {
+                return Err(err);
             }
+        }
+        match model {
             Ok(model) => {
                 let now = battery.timestamp;
                 let new_history = self.history(&now, &battery, &system).await?;
@@ -109,6 +110,7 @@ impl BatteryStore {
                 }
                 Ok((changed_vec, Some(model)))
             }
+            Err(e) => Err(e),
         }
     }
 

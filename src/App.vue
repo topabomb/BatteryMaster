@@ -11,6 +11,7 @@
           active-color="white"
           class="text-grey"
           indicator-color="transparent"
+          align="left"
         >
           <q-route-tab name="monitor" label="监控" to="/monitor" exact />
 
@@ -30,6 +31,7 @@
           :color="state_color"
           dense
           class="q-ml-none q-pl-none"
+          no-wrap
         >
           <q-chip square :color="state_color" size="sm" class="text-white">
             {{ (battery_store.percentage * 100).toFixed(1) }}%
